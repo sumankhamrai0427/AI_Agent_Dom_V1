@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aetheris - Autonomous AI Browser Agent</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- CSS Styles -->
+    <style>
+        :root {
+            --bg-dark: #0B0F19;
+            --bg-glass: rgba(17, 24, 39, 0.7);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --primary: #6366F1;
+            --primary-glow: rgba(99, 102, 241, 0.4);
+            --secondary: #10B981;
+            --accent: #F59E0B;
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+            --danger: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 24px;
+        }
+
+        /* Container & Layout */
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-glass);
+            margin-bottom: 32px;
+        }
+
+        .logo-section h1 {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #FFF 30%, var(--primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-section p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-glass);
+            border: 1px solid var(--border-glass);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--secondary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Grid panels */
+        .grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .grid-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .glass-panel {
+            background: var(--bg-glass);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .glass-panel:hover {
+            box-shadow: 0 8px 32px 0 rgba(99, 102, 241, 0.08);
+        }
+
+        .panel-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #FFF;
+        }
+
+        /* Form elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control, select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            color: #FFF;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 15px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-glow);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .file-upload-wrapper {
+            position: relative;
+            background: rgba(99, 102, 241, 0.04);
+            border: 2px dashed var(--border-glass);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-wrapper:hover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .file-upload-wrapper input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, #4F46E5 100%);
+            color: #FFF;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px var(--primary-glow);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+        }
+
+        /* Console & Log elements */
+        .status-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-glass);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .status-info h3 {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .status-info p {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            padding: 6px 16px;
+            border-radius: 50px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-pending { background: #374151; color: #D1D5DB; }
+        .badge-running { background: rgba(99, 102, 241, 0.2); color: #818CF8; border: 1px solid var(--primary); }
+        .badge-completed { background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid var(--secondary); }
+        .badge-failed { background: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid var(--danger); }
+        .badge-captcha { background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid var(--accent); }
+
+        .terminal-console {
+            background: #030712;
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 16px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 13px;
+            height: 250px;
+            overflow-y: auto;
+            color: #34D399;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.8);
+            margin-bottom: 20px;
+        }
+
+        .terminal-line {
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .terminal-time { color: #6B7280; }
+        .terminal-agent { color: #818CF8; font-weight: bold; }
+        .terminal-error { color: var(--danger); }
+
+        .live-view-panel {
+            background: #1F2937;
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            height: 380px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .live-screenshot {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+        }
+
+        .live-placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .live-placeholder svg {
+            width: 48px;
+            height: 48px;
+            fill: currentColor;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            background: #111827;
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            width: 500px;
+            padding: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .modal-card h2 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--accent);
+        }
+
+        .modal-card p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .captcha-box {
+            width: 100%;
+            height: 200px;
+            background: #1F2937;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .captcha-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .solve-btn {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .solve-btn:hover {
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+            transform: translateY(-1px);
+        }
+
+        /* Bottom Results panel */
+        .bottom-results {
+            margin-top: 24px;
+            display: none;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .gis-frame-wrapper {
+            width: 100%;
+            height: 380px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+        }
+
+        .gis-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .report-downloads {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            justify-content: center;
+        }
+
+        .download-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .download-card:hover {
+            background: rgba(255,255,255,0.06);
+            border-color: var(--primary);
+        }
+
+        .download-info h4 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .download-info p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .btn-download {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .btn-download:hover {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px var(--primary-glow);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-container">
+        
+        <!-- Header -->
+        <header>
+            <div class="logo-section">
+                <h1>AETHERIS</h1>
+                <p>Autonomous AI Browser Agent for Land Records Verification</p>
+            </div>
+            <div class="system-status">
+                <span class="status-dot"></span>
+                <span>Agent Status: Online</span>
+            </div>
+        </header>
+
+        <!-- Main Body Layout -->
+        <div class="grid-layout">
+            
+            <!-- Left Panel: Job Submission -->
+            <div class="glass-panel">
+                <h2 class="panel-title">
+                    <svg style="width:20px;height:20px;fill:var(--primary)" viewBox="0 0 24 24"><path d="M19 13H13V19H11V13H5V11H11V5H13V11H19V13Z"/></svg>
+                    New Ownership Audit
+                </h2>
+                
+                <form id="taskForm" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="state">State Portal</label>
+                        <select id="state" name="state">
+                            <option value="UP">Uttar Pradesh</option>
+                            <option value="BIHAR">Bihar</option>
+                            <option value="WB">West Bengal</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Upload Land Deed / PDF Scan</label>
+                        <div class="file-upload-wrapper">
+                            <svg style="width:32px;height:32px;fill:var(--text-muted);margin-bottom:8px;" viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
+                            <p id="fileLabel" style="font-size:14px;font-weight:500;">Drag & drop or click to browse</p>
+                            <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">Supports PDF, PNG, JPG, JPEG</p>
+                            <input type="file" id="deed_file" name="deed_file" accept=".pdf,.png,.jpg,.jpeg" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">Run Autonomous Audit</button>
+                </form>
+            </div>
+
+            <!-- Right Panel: Live Execution Console -->
+            <div class="glass-panel">
+                <h2 class="panel-title">
+                    <svg style="width:20px;height:20px;fill:var(--secondary)" viewBox="0 0 24 24"><path d="M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.89,3 4,3H20M11,17H13V15H11V17M11,13H13V9H11V13Z"/></svg>
+                    Live Agent Console
+                </h2>
+
+                <!-- Status details header -->
+                <div class="status-container">
+                    <div class="status-info">
+                        <h3 id="consoleTaskId">Task ID: --</h3>
+                        <p id="consoleStep">Current Step: Awaiting objective submission</p>
+                    </div>
+                    <div id="statusBadge" class="status-badge badge-pending">Idle</div>
+                </div>
+
+                <!-- Extracted Deed Preview Panel -->
+                <div class="deed-preview-card" id="deedPreviewCard" style="display: none; margin-bottom: 16px; padding: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border); border-radius: 8px;">
+                    <h3 style="font-size: 14px; font-weight: 600; color: var(--secondary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; margin-top: 0;">
+                        <svg style="width:16px;height:16px;fill:var(--secondary);" viewBox="0 0 24 24"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20M16,11V13H8V11H16M16,15V17H8V15H16Z"/></svg>
+                        Extracted Deed Data (PDF Preview)
+                    </h3>
+                    <div id="deedPreviewContent" style="font-size: 12px; line-height: 1.6; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; color: var(--text-muted);">
+                        <!-- Filled dynamically -->
+                    </div>
+                </div>
+
+                <!-- Real-time Agent Action Log -->
+                <div class="terminal-console" id="logTerminal">
+                    <div class="terminal-line"><span class="terminal-time">[13:00:00]</span> <span class="terminal-agent">[Aetheris]</span> Initialize system. Awaiting task request.</div>
+                </div>
+
+                <!-- Real-time Browser View -->
+                <div class="live-view-panel">
+                    <img id="liveViewImg" class="live-screenshot" src="" alt="Live Browser Screenshot">
+                    <div class="live-placeholder" id="livePlaceholder">
+                        <svg viewBox="0 0 24 24"><path d="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"/></svg>
+                        <p style="font-weight:600;">Live Browser Feed</p>
+                        <p style="font-size:12px;margin-top:4px;">Visual representation of agent page browser states.</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Section Bottom: Results & GIS Mapping details -->
+        <div class="glass-panel bottom-results" id="resultsSection">
+            <h2 class="panel-title">
+                <svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24"><path d="M15,21H9V20H15V21M19,8H17.73C17.38,5.68 15.39,4 13,4C12.33,4 11.68,4.13 11.08,4.37C10.58,3.5 9.61,3 8.5,3C6.7,3 5.25,4.34 5.04,6.08C3.28,6.58 2,8.19 2,10A4,4 0 0,0 6,14H7.17C7.6,16.29 9.6,18 12,18C14.4,18 16.4,16.29 16.83,14H19A4,4 0 0,0 23,10A4,4 0 0,0 19,8M12,16A2,2 0 1,1 14,14A2,2 0 0,1 12,16Z"/></svg>
+                Audit Results & Geographic Information Systems
+            </h2>
+            
+            <div class="results-grid">
+                
+                <!-- GIS Interactive Leaflet Map -->
+                <div class="gis-frame-wrapper">
+                    <iframe class="gis-iframe" id="gisIframe" src=""></iframe>
+                </div>
+
+                <!-- Generated Download Reports -->
+                <div class="report-downloads">
+                    
+                    <div class="download-card">
+                        <div class="download-info">
+                            <h4>Verification Summary Report</h4>
+                            <p>Download structured matching audits (HTML / PDF printable format).</p>
+                        </div>
+                        <a href="#" class="btn-download" id="downloadHtml" target="_blank">View Report</a>
+                    </div>
+
+                    <div class="download-card">
+                        <div class="download-info">
+                            <h4>Excel Audit Trail</h4>
+                            <p>Export steps timeline, coordinates, and extracted elements sheet.</p>
+                        </div>
+                        <a href="#" class="btn-download" id="downloadExcel" download>Download Excel</a>
+                    </div>
+
+                    <div class="download-card">
+                        <div class="download-info">
+                            <h4>GeoJSON Boundaries</h4>
+                            <p>Coordinate shape boundaries file format for external mapping engines.</p>
+                        </div>
+                        <a href="#" class="btn-download" id="downloadGeoJson" download>Download GeoJSON</a>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- CAPTCHA Solve Dialog Modal Overlay -->
+    <div class="modal-overlay" id="captchaModal">
+        <div class="modal-card">
+            <h2 id="captchaModalTitle">CAPTCHA Challenge Detected</h2>
+            <p id="captchaModalDesc">The autonomous browser agent is currently paused. Please solve the captcha in the image below, then click continue.</p>
+            
+            <div class="captcha-box">
+                <!-- Serves live screenshot mapping captcha field coords -->
+                <img id="captchaImageSrc" src="" alt="CAPTCHA Element">
+            </div>
+            
+            <button class="solve-btn" id="btnSolveCaptcha">Resume Workflow</button>
+        </div>
+    </div>
+
+    <!-- JS Client Logic -->
+    <script src="/static/dashboard.js"></script>
+</body>
+</html>
