@@ -48,8 +48,13 @@ class DocumentAgent:
         2. CRITICAL LANGUAGE REQUIREMENT:
            You MUST extract the fields in their original language and script from the document text. DO NOT translate names, villages, districts, or any text to another language.
         
-        3. IMPORTANT FONT ENCODING CORRECTION (only for Hindi/Devanagari text):
-           If the input text is in Hindi/Devanagari, standard spelling corrections should be applied to correct any garbled characters.
+        3. IMPORTANT FONT ENCODING & SPELLING CORRECTION (only for Hindi/Devanagari text):
+           If the input text is in Hindi/Devanagari, you MUST correct any garbled characters, font encoding distortions, or obvious spelling typos to their standard spelling.
+           For example:
+           - Correct 'अवमत' to 'अमित'
+           - Correct 'यादि' to 'यादव'
+           - Correct 'पपता' to 'पिता'
+           Apply these spelling corrections robustly so names and fields match standard database values.
            
         4. You MUST extract the following keys exactly:
            - "utility_type": "LAND" or "ELECTRICITY"
