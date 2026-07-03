@@ -1,7 +1,7 @@
 import os
 import asyncio
 from playwright.async_api import async_playwright
-from playwright_stealth import stealth_async
+from playwright_stealth import Stealth
 from utils.logger import logger
 from utils.config import SCREENSHOT_DIR
 
@@ -40,7 +40,7 @@ class BrowserManager:
         self.page = await self.context.new_page()
         
         # Apply Playwright Stealth logic
-        await stealth_async(self.page)
+        await Stealth().apply_stealth_async(self.page)
         
         # Bypass simple bot detection by removing webdriver property
         await self.page.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
