@@ -3,9 +3,21 @@ from flask import Flask
 from models.models import init_db
 from controllers.task_controller import TaskController
 from utils.logger import logger
+from utils.socket_instance import socketio
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 controller = TaskController()
+
+# Initialize SocketIO with Flask app
+socketio.init_app(app)
+
+@socketio.on('connect')
+def handle_connect():
+    logger.info("Client connected to SocketIO server.")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info("Client disconnected from SocketIO server.")
 
 @app.route("/")
 def index():
@@ -50,5 +62,5 @@ os.makedirs("storage/uploads", exist_ok=True)
 if __name__ == "__main__":
     logger.info("Initializing database...")
     init_db()
-    logger.info("Starting Flask application server on http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    logger.info("Starting Flask SocketIO server on http://localhost:5000")
+    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)

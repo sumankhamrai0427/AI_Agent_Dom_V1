@@ -67,8 +67,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Hide results section if visible from previous run
                 resultsSection.style.display = "none";
                 
-                // Start polling status
-                startPolling(currentTaskId);
+                // Load initial task state once
+                fetchTaskState(currentTaskId);
             } else {
                 addTerminalLine("SystemError", `Failed to initiate task: ${data.error}`, "error");
             }
@@ -77,48 +77,72 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // 3. Status Polling Loop
-    function startPolling(taskId) {
-        if (pollIntervalId) clearInterval(pollIntervalId);
-        
-        pollIntervalId = setInterval(async () => {
-            try {
-                const response = await fetch(`/api/tasks/${taskId}`);
-                const data = await response.json();
+    // Initialize Socket.IO connection
+    const socket = io();
+
+    socket.on("log_added", (log) => {
+        if (currentTaskId && log.task_id === currentTaskId) {
+            const logSignature = `${log.timestamp || new Date().toISOString()}_${log.agent_name}_${log.action}`;
+            if (!loggedTimestamps.has(logSignature)) {
+                loggedTimestamps.add(logSignature);
                 
-                if (data.success) {
-                    const task = data.task;
-                    updateUIStatus(task);
-                    processLogs(task.logs);
-                    
-                    if (task.status === "COMPLETED") {
-                        clearInterval(pollIntervalId);
-                        addTerminalLine("Supervisor", "Workflow finalized successfully! Output files ready.", "success");
-                        
-                        // Log validation results to terminal console
-                        if (task.verification) {
-                            if (!task.verification.is_valid) {
-                                addTerminalLine("ValidationAgent", "WARNING: Mismatch/discrepancies detected between Deed and Portal!", "error");
-                                if (task.verification.conflicts && Array.isArray(task.verification.conflicts)) {
-                                    task.verification.conflicts.forEach(conflict => {
-                                        addTerminalLine("ValidationAgent", `  - Discrepancy: ${conflict}`, "warning");
-                                    });
-                                }
-                            } else {
-                                addTerminalLine("ValidationAgent", "SUCCESS: All records matched successfully with the government database!", "success");
-                            }
-                        }
-                        
-                        displayResults(task);
-                    } else if (task.status === "FAILED") {
-                        clearInterval(pollIntervalId);
-                        addTerminalLine("Supervisor", `Workflow terminated with error: ${task.error_message}`, "error");
-                    }
-                }
-            } catch (err) {
-                console.error("Polling error:", err);
+                let lineType = "info";
+                if (log.status === "FAILURE") lineType = "error";
+                else if (log.status === "WARNING") lineType = "warning";
+                
+                const msg = log.result || log.error_message || `Executing: ${log.action}`;
+                addTerminalLine(log.agent_name, msg, lineType);
             }
-        }, 2000);
+            if (log.screenshot_url) {
+                liveViewImg.src = log.screenshot_url;
+                liveViewImg.style.display = "block";
+                livePlaceholder.style.display = "none";
+            }
+        }
+    });
+
+    socket.on("task_updated", (update) => {
+        if (currentTaskId && update.task_id === currentTaskId) {
+            fetchTaskState(currentTaskId);
+        }
+    });
+
+    // 3. Fetch Task State
+    async function fetchTaskState(taskId) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                const task = data.task;
+                updateUIStatus(task);
+                processLogs(task.logs);
+                
+                if (task.status === "COMPLETED") {
+                    addTerminalLine("Supervisor", "Workflow finalized successfully! Output files ready.", "success");
+                    
+                    // Log validation results to terminal console
+                    if (task.verification) {
+                        if (!task.verification.is_valid) {
+                            addTerminalLine("ValidationAgent", "WARNING: Mismatch/discrepancies detected between Deed and Portal!", "error");
+                            if (task.verification.conflicts && Array.isArray(task.verification.conflicts)) {
+                                task.verification.conflicts.forEach(conflict => {
+                                    addTerminalLine("ValidationAgent", `  - Discrepancy: ${conflict}`, "warning");
+                                });
+                            }
+                        } else {
+                            addTerminalLine("ValidationAgent", "SUCCESS: All records matched successfully with the government database!", "success");
+                        }
+                    }
+                    
+                    displayResults(task);
+                } else if (task.status === "FAILED") {
+                    addTerminalLine("Supervisor", `Workflow terminated with error: ${task.error_message}`, "error");
+                }
+            }
+        } catch (err) {
+            console.error("Fetch state error:", err);
+        }
     }
 
     // 4. Update Header and Badges
