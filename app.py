@@ -62,5 +62,21 @@ os.makedirs("storage/uploads", exist_ok=True)
 if __name__ == "__main__":
     logger.info("Initializing database...")
     init_db()
+    
+    # Auto-cleanup stale RUNNING/PENDING tasks on server startup
+    try:
+        from models.models import SessionLocal, Task
+        db = SessionLocal()
+        stuck_tasks = db.query(Task).filter(Task.status.in_(["RUNNING", "PAUSED_CAPTCHA", "PENDING"])).all()
+        for t in stuck_tasks:
+            logger.info(f"Cleaning up stale task #{t.id} from previous session.")
+            t.status = "FAILED"
+            t.error_message = "Server restarted during execution."
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.warning(f"Failed to clean up stale tasks on startup: {e}")
+
     logger.info("Starting Flask SocketIO server on http://localhost:5000")
     socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
+
