@@ -22,13 +22,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const downloadGeoJson = document.getElementById("downloadGeoJson");
 
     let currentTaskId = null;
-    let pollIntervalId = null;
     let loggedTimestamps = new Set();
 
     // 1. File Upload styling update
     deedFileInput.addEventListener("change", (e) => {
         if (e.target.files.length > 0) {
-            fileLabel.textContent = `Deed Selected: ${e.target.files[0].name}`;
+            fileLabel.textContent = `File Selected: ${e.target.files[0].name}`;
             fileLabel.style.color = "var(--secondary)";
         } else {
             fileLabel.textContent = "Drag & drop or click to browse";
@@ -67,6 +66,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Hide results section if visible from previous run
                 resultsSection.style.display = "none";
                 
+                // Refresh task list sidebar
+                await loadTaskHistory();
+                
                 // Load initial task state once
                 fetchTaskState(currentTaskId);
             } else {
@@ -98,12 +100,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 liveViewImg.style.display = "block";
                 livePlaceholder.style.display = "none";
             }
+            if (log.url) {
+                document.getElementById("browserUrlText").textContent = log.url;
+            }
         }
     });
 
-    socket.on("task_updated", (update) => {
-        if (currentTaskId && update.task_id === currentTaskId) {
-            fetchTaskState(currentTaskId);
+    socket.on("task_updated", async (update) => {
+        if (update.task_id) {
+            // Reload history list status changes in background
+            await loadTaskHistory();
+            
+            if (currentTaskId && update.task_id === currentTaskId) {
+                fetchTaskState(currentTaskId);
+            }
         }
     });
 
@@ -161,6 +171,12 @@ document.addEventListener("DOMContentLoaded", () => {
             showCaptchaModal(task.logs);
         }
 
+        // Update workflow pipeline progress bar and labels
+        updatePipelineTracker(task);
+        
+        // Update mock browser address text URL
+        updateBrowserUrl(task);
+
         // If task has extracted document, render the deed preview
         const deedPreviewCard = document.getElementById("deedPreviewCard");
         const deedPreviewContent = document.getElementById("deedPreviewContent");
@@ -169,14 +185,16 @@ document.addEventListener("DOMContentLoaded", () => {
             deedPreviewCard.style.display = "block";
             const doc = task.extracted_document;
             deedPreviewContent.innerHTML = `
-                <div><strong>Owner:</strong> <span style="color:var(--secondary)">${doc.owner_name || 'N/A'}</span></div>
-                <div><strong>Father:</strong> <span style="color:var(--text)">${doc.father_name || 'N/A'}</span></div>
-                <div><strong>State / Dist:</strong> <span style="color:var(--text)">${task.metadata.state || 'N/A'} / ${doc.district || 'N/A'}</span></div>
-                <div><strong>Village:</strong> <span style="color:var(--text)">${doc.village || 'N/A'}</span></div>
-                <div><strong>Khata / Plot:</strong> <span style="color:var(--secondary)">${doc.khata || 'N/A'}</span></div>
-                <div><strong>Khasra:</strong> <span style="color:var(--text)">${doc.khasra || 'N/A'}</span></div>
-                <div><strong>Area:</strong> <span style="color:var(--text)">${doc.area || 'N/A'}</span></div>
-                <div><strong>Ref No:</strong> <span style="color:var(--text)">${doc.reference_number || 'N/A'}</span></div>
+                <div><strong>Owner Name:</strong> <span style="color:var(--secondary)">${doc.owner_name || 'N/A'}</span></div>
+                <div><strong>Father/Spouse:</strong> <span style="color:#FFF">${doc.father_name || 'N/A'}</span></div>
+                <div><strong>Utility Type:</strong> <span style="color:#FFF;text-transform:uppercase">${doc.utility_type || 'N/A'}</span></div>
+                <div><strong>Village Name:</strong> <span style="color:#FFF">${doc.village || 'N/A'}</span></div>
+                <div><strong>Khata Number:</strong> <span style="color:var(--secondary)">${doc.khata || 'N/A'}</span></div>
+                <div><strong>Khasra/Plot:</strong> <span style="color:#FFF">${doc.khasra || doc.survey_no || 'N/A'}</span></div>
+                <div><strong>Area:</strong> <span style="color:#FFF">${doc.area || 'N/A'}</span></div>
+                <div><strong>Consumer ID:</strong> <span style="color:var(--secondary)">${doc.consumer_id || 'N/A'}</span></div>
+                <div><strong>Installation ID:</strong> <span style="color:#FFF">${doc.installation_no || 'N/A'}</span></div>
+                <div><strong>Bill Amount:</strong> <span style="color:#FFF">${doc.bill_amount || 'N/A'}</span></div>
             `;
         } else if (deedPreviewCard) {
             deedPreviewCard.style.display = "none";
@@ -196,7 +214,8 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!loggedTimestamps.has(logSignature)) {
                 loggedTimestamps.add(logSignature);
                 
-                const timeStr = log.timestamp.split(" ")[1];
+                const timeParts = log.timestamp.split(" ");
+                const timeStr = timeParts.length > 1 ? timeParts[1] : timeParts[0];
                 let lineType = "info";
                 if (log.status === "FAILURE") lineType = "error";
                 else if (log.status === "WARNING") lineType = "warning";
@@ -230,6 +249,8 @@ document.addEventListener("DOMContentLoaded", () => {
         
         let colorClass = "";
         if (type === "error") colorClass = "terminal-error";
+        else if (type === "warning") colorClass = "terminal-warning";
+        else if (type === "success") colorClass = "terminal-success";
         
         line.innerHTML = `
             <span class="terminal-time">[${timeStr}]</span>
@@ -297,15 +318,232 @@ document.addEventListener("DOMContentLoaded", () => {
         // Load GIS Interactive map
         if (task.gis_data && task.gis_data.map_html_url) {
             gisIframe.src = task.gis_data.map_html_url;
+        } else {
+            gisIframe.src = "";
         }
         
         // Configure report links
         if (task.metadata.html_report) {
             downloadHtml.href = `/api/storage/reports/${task.metadata.html_report.split(/[/\\]/).pop()}`;
+            downloadHtml.style.pointerEvents = "auto";
+            downloadHtml.style.opacity = "1";
+        } else {
+            downloadHtml.href = "#";
+            downloadHtml.style.pointerEvents = "none";
+            downloadHtml.style.opacity = "0.5";
         }
+        
         if (task.metadata.excel_report) {
             downloadExcel.href = `/api/storage/reports/${task.metadata.excel_report.split(/[/\\]/).pop()}`;
+            downloadExcel.style.pointerEvents = "auto";
+            downloadExcel.style.opacity = "1";
+        } else {
+            downloadExcel.href = "#";
+            downloadExcel.style.pointerEvents = "none";
+            downloadExcel.style.opacity = "0.5";
         }
-        downloadGeoJson.href = `/api/storage/reports/plot_${task.id}_geojson.json`;
+        
+        if (task.gis_data) {
+            downloadGeoJson.href = `/api/storage/reports/plot_${task.id}_geojson.json`;
+            downloadGeoJson.style.pointerEvents = "auto";
+            downloadGeoJson.style.opacity = "1";
+        } else {
+            downloadGeoJson.href = "#";
+            downloadGeoJson.style.pointerEvents = "none";
+            downloadGeoJson.style.opacity = "0.5";
+        }
     }
+
+    // 8. Dynamic Sidebar Audit History Loader
+    async function loadTaskHistory() {
+        try {
+            const response = await fetch("/api/tasks");
+            const data = await response.json();
+            if (data.success && Array.isArray(data.tasks)) {
+                const historyList = document.getElementById("auditHistoryList");
+                if (historyList) {
+                    if (data.tasks.length === 0) {
+                        historyList.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">No audits found</p>`;
+                        return;
+                    }
+                    
+                    historyList.innerHTML = "";
+                    // Sort descending by ID
+                    const sortedTasks = data.tasks.sort((a, b) => b.id - a.id);
+                    
+                    sortedTasks.forEach(task => {
+                        const item = document.createElement("div");
+                        item.className = "history-item";
+                        if (currentTaskId === task.id) {
+                            item.classList.add("active");
+                        }
+                        
+                        let badgeClass = "badge-pending";
+                        if (task.status === "RUNNING") badgeClass = "badge-running";
+                        else if (task.status === "COMPLETED") badgeClass = "badge-completed";
+                        else if (task.status === "FAILED") badgeClass = "badge-failed";
+                        else if (task.status === "PAUSED_CAPTCHA") badgeClass = "badge-captcha";
+                        
+                        const stateText = task.metadata && task.metadata.state ? task.metadata.state : "WB";
+                        const desc = task.objective ? task.objective.replace("Deed Audit: Run autonomous ownership verification audit for uploaded deed in state: ", "") : "Autonomous Audit";
+                        
+                        item.innerHTML = `
+                            <div class="history-details">
+                                <div class="history-id">Audit Run #${task.id} <span style="font-size: 10px; color: var(--primary); margin-left: 5px; font-weight:700;">[${stateText}]</span></div>
+                                <div class="history-desc" title="${task.objective}">${desc}</div>
+                            </div>
+                            <span class="status-badge ${badgeClass}" style="font-size: 9px; padding: 3px 8px; border-radius:4px;">${task.status}</span>
+                        `;
+                        
+                        item.addEventListener("click", () => {
+                            selectTask(task.id);
+                        });
+                        historyList.appendChild(item);
+                    });
+                }
+            }
+        } catch (err) {
+            console.error("Failed to load task history:", err);
+        }
+    }
+
+    // Select and load a task from history
+    function selectTask(taskId) {
+        currentTaskId = taskId;
+        
+        // Highlight active list item
+        const items = document.querySelectorAll(".history-item");
+        items.forEach(item => {
+            const idEl = item.querySelector(".history-id");
+            if (idEl && idEl.textContent.includes(`Audit Run #${taskId} `)) {
+                item.classList.add("active");
+            } else {
+                item.classList.remove("active");
+            }
+        });
+        
+        consoleTaskId.textContent = `Task ID: #${taskId}`;
+        logTerminal.innerHTML = "";
+        loggedTimestamps.clear();
+        
+        // Reset browser frame and progress bar
+        liveViewImg.style.display = "none";
+        livePlaceholder.style.display = "block";
+        document.getElementById("browserUrlText").textContent = "about:blank";
+        resultsSection.style.display = "none";
+        
+        // Fetch specific task state
+        fetchTaskState(taskId);
+    }
+
+    // Pipeline Tracker Logic
+    function updatePipelineTracker(task) {
+        const progressBar = document.getElementById("pipelineProgressBar");
+        const progressText = document.getElementById("pipelineProgressText");
+        
+        const lblStepDoc = document.getElementById("lblStepDoc");
+        const lblStepVal = document.getElementById("lblStepVal");
+        const lblStepSearch = document.getElementById("lblStepSearch");
+        const lblStepVerify = document.getElementById("lblStepVerify");
+        const lblStepReport = document.getElementById("lblStepReport");
+        
+        const labels = [lblStepDoc, lblStepVal, lblStepSearch, lblStepVerify, lblStepReport];
+        
+        labels.forEach(lbl => {
+            if (lbl) {
+                lbl.classList.remove("active");
+                lbl.classList.remove("completed");
+            }
+        });
+        
+        let percent = 0;
+        let activeIdx = -1;
+        
+        if (task.status === "COMPLETED") {
+            percent = 100;
+            activeIdx = 5;
+        } else if (task.status === "FAILED") {
+            percent = 100;
+            activeIdx = 5;
+        } else {
+            const step = (task.current_step || "").toLowerCase();
+            
+            if (step.includes("extract")) {
+                percent = 15;
+                activeIdx = 0;
+            } else if (step.includes("validate") || step.includes("standard")) {
+                percent = 35;
+                activeIdx = 1;
+            } else if (step.includes("search") || step.includes("portal") || step.includes("captcha") || step.includes("browser")) {
+                percent = 60;
+                activeIdx = 2;
+            } else if (step.includes("verify") || step.includes("comparison") || step.includes("findings")) {
+                percent = 80;
+                activeIdx = 3;
+            } else if (step.includes("report") || step.includes("gis") || step.includes("finalize")) {
+                percent = 95;
+                activeIdx = 4;
+            } else {
+                percent = 5;
+                activeIdx = 0;
+            }
+        }
+        
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressText) progressText.textContent = `${percent}% Completed`;
+        
+        labels.forEach((lbl, idx) => {
+            if (lbl) {
+                if (idx < activeIdx) {
+                    lbl.classList.add("completed");
+                } else if (idx === activeIdx) {
+                    lbl.classList.add("active");
+                }
+            }
+        });
+    }
+
+    // Sync address bar
+    function updateBrowserUrl(task) {
+        const browserUrlText = document.getElementById("browserUrlText");
+        if (!browserUrlText) return;
+        
+        let url = "about:blank";
+        const state = (task.metadata && task.metadata.state ? task.metadata.state : "").toUpperCase();
+        
+        if (task.logs && task.logs.length > 0) {
+            for (let i = 0; i < task.logs.length; i++) {
+                const log = task.logs[i];
+                if (log.url) {
+                    url = log.url;
+                    break;
+                }
+            }
+        }
+        
+        if (url === "about:blank") {
+            if (state === "WB") {
+                url = "https://portal.wbsedcl.in/webdynpro/resources/wbsedcl/viewbillwl/WBViewBillWL";
+            } else if (state === "UP") {
+                url = "https://upbhunaksha.gov.in/";
+            } else if (state === "BIHAR") {
+                url = "https://biharbhumi.bihar.gov.in/";
+            }
+        }
+        
+        browserUrlText.textContent = url;
+    }
+
+    // Initialize Dashboard
+    async function initDashboard() {
+        await loadTaskHistory();
+        
+        // Auto-select the latest task if available
+        const firstItem = document.querySelector(".history-item");
+        if (firstItem) {
+            firstItem.click();
+        }
+    }
+    
+    initDashboard();
 });

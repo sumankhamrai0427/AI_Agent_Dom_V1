@@ -12,6 +12,19 @@ class TaskService:
 
     def create_search_task(self, objective, metadata=None):
         logger.info(f"Service triggering new search task: objective='{objective}'")
+        
+        # Proactively cancel any previous active tasks to release browser sessions
+        try:
+            from models.models import Task
+            active_tasks = self.repository.session.query(Task).filter(Task.status.in_(["RUNNING", "PAUSED_CAPTCHA", "PENDING"])).all()
+            for t in active_tasks:
+                logger.info(f"Cancelling previous running/paused task #{t.id} to avoid conflicts.")
+                t.status = "FAILED"
+                t.error_message = "Task cancelled because a new task was started."
+            self.repository.commit()
+        except Exception as e:
+            logger.warning(f"Failed to cancel previous tasks: {e}")
+            
         task = self.repository.create_task(objective, metadata)
         
         # Spawn Supervisor workflow in a background thread to prevent Flask blocking

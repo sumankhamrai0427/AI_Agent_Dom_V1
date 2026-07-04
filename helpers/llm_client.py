@@ -112,39 +112,31 @@ class LLMClient:
 
     @classmethod
     def call_llm(cls, prompt, system_instruction=None, json_mode=False):
-        # Try Gemini first if explicitly selected (support common typo "gimini")
-        if ACTIVE_LLM in ["gemini"]:
-            if GEMINI_API_KEY:
-                try:
-                    logger.info(f"Calling Gemini ({GEMINI_MODEL})...")
-                    return cls._call_gemini(prompt, system_instruction, response_schema=json_mode)
-                except Exception as e:
-                    logger.warning(f"Gemini call failed. Error: {e}")
-
-        # Try Local Mistral if configured
-        if ACTIVE_LLM == "mistral_small":
+        # 1. Try Local Mistral first (if configured/available)
+        if MISTRAL_LOCAL_URL:
             try:
                 logger.info(f"Calling Local Mistral ({MISTRAL_LOCAL_MODEL})...")
                 return cls._call_local_mistral(prompt, system_instruction, json_mode=json_mode)
             except Exception as e:
                 logger.warning(f"Local Mistral failed, attempting fallback. Error: {e}")
 
-        # Try Mistral first if configured, else fallback to Gemini, else fallback to Mock
+        # 2. Try Mistral Cloud next if API key is configured
         if MISTRAL_API_KEY:
             try:
-                logger.info(f"Calling Mistral ({MISTRAL_MODEL})...")
+                logger.info(f"Calling Mistral Cloud ({MISTRAL_MODEL})...")
                 return cls._call_mistral(prompt, system_instruction, response_format_json=json_mode)
             except Exception as e:
-                logger.warning(f"Mistral failed, attempting Gemini. Error: {e}")
-        
+                logger.warning(f"Mistral Cloud failed, attempting fallback. Error: {e}")
+
+        # 3. Try Gemini as fallback if API key is configured
         if GEMINI_API_KEY:
             try:
                 logger.info(f"Calling Gemini ({GEMINI_MODEL})...")
                 return cls._call_gemini(prompt, system_instruction, response_schema=json_mode)
             except Exception as e:
-                logger.warning(f"Gemini failed. Error: {e}")
+                logger.warning(f"Gemini call failed. Error: {e}")
 
-        # If no keys or they failed, fallback to simulated responses
+        # 4. If all failed or no keys configured, fallback to simulation mode
         logger.warning("No API Keys configured or calls failed. Operating in Simulation Mode.")
         return cls._simulate_response(prompt, json_mode)
 
