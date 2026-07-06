@@ -47,8 +47,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const formData = new FormData(taskForm);
         
         // Append a user-friendly objective based on selected state
-        const state = formData.get("state");
-        const objective = `Deed Audit: Run autonomous ownership verification audit for uploaded deed in state: ${state}.`;
+        const state = formData.get("state") || "Auto-detect";
+        const objective = `Deed Audit: Run autonomous ownership verification audit for uploaded deed (State: ${state}).`;
         formData.append("objective", objective);
 
         try {
