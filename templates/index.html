@@ -11,6 +11,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
+        
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- CSS Styles -->
     <style>
@@ -742,45 +745,58 @@
                     <path
                         d="M15,21H9V20H15V21M19,8H17.73C17.38,5.68 15.39,4 13,4C12.33,4 11.68,4.13 11.08,4.37C10.58,3.5 9.61,3 8.5,3C6.7,3 5.25,4.34 5.04,6.08C3.28,6.58 2,8.19 2,10A4,4 0 0,0 6,14H7.17C7.6,16.29 9.6,18 12,18C14.4,18 16.4,16.29 16.83,14H19A4,4 0 0,0 23,10A4,4 0 0,0 19,8M12,16A2,2 0 1,1 14,14A2,2 0 0,1 12,16Z" />
                 </svg>
-                Audit Results & Geographic Information Systems
+                Reports & Downloads
             </h2>
 
-            <div class="results-grid">
+            <!-- Generated Download Reports -->
+            <div class="report-downloads" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 100%;">
 
-                <!-- GIS Interactive Leaflet Map -->
-                <div class="gis-frame-wrapper">
-                    <iframe class="gis-iframe" id="gisIframe" src=""></iframe>
+                <div class="download-card">
+                    <div class="download-info">
+                        <h4>Verification Summary Report</h4>
+                        <p>Download structured matching audits (HTML / PDF printable format).</p>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <a href="#" class="btn-download" id="viewHtml" target="_blank">View Report</a>
+                        <a href="#" class="btn-download" id="downloadHtml" target="_blank" style="background: var(--surface); color: var(--accent); border: 1px solid var(--accent);">Download Report</a>
+                    </div>
                 </div>
 
-                <!-- Generated Download Reports -->
-                <div class="report-downloads">
-
-                    <div class="download-card">
-                        <div class="download-info">
-                            <h4>Verification Summary Report</h4>
-                            <p>Download structured matching audits (HTML / PDF printable format).</p>
-                        </div>
-                        <a href="#" class="btn-download" id="downloadHtml" target="_blank">View Report</a>
+                <div class="download-card">
+                    <div class="download-info">
+                        <h4>Excel Audit Trail</h4>
+                        <p>Export steps timeline, coordinates, and extracted elements sheet.</p>
                     </div>
-
-                    <div class="download-card">
-                        <div class="download-info">
-                            <h4>Excel Audit Trail</h4>
-                            <p>Export steps timeline, coordinates, and extracted elements sheet.</p>
-                        </div>
-                        <a href="#" class="btn-download" id="downloadExcel" download>Download Excel</a>
-                    </div>
-
-                    <div class="download-card">
-                        <div class="download-info">
-                            <h4>GeoJSON Boundaries</h4>
-                            <p>Coordinate shape boundaries file format for external mapping engines.</p>
-                        </div>
-                        <a href="#" class="btn-download" id="downloadGeoJson" download>Download GeoJSON</a>
-                    </div>
-
+                    <a href="#" class="btn-download" id="downloadExcel" download>Download Excel</a>
                 </div>
 
+                <div class="download-card">
+                    <div class="download-info">
+                        <h4>GeoJSON Boundaries</h4>
+                        <p>Coordinate shape boundaries file format for external mapping engines.</p>
+                    </div>
+                    <a href="#" class="btn-download" id="downloadGeoJson" download>Download GeoJSON</a>
+                </div>
+
+            </div>
+        </div>
+        
+        <!-- Audit Results & Geographic Information Systems -->
+        <div class="glass-panel bottom-results" id="insightsSectionWrapper" style="margin-top: 20px; display: none;">
+            <h2 class="panel-title">
+                <svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24">
+                    <path
+                        d="M15,21H9V20H15V21M19,8H17.73C17.38,5.68 15.39,4 13,4C12.33,4 11.68,4.13 11.08,4.37C10.58,3.5 9.61,3 8.5,3C6.7,3 5.25,4.34 5.04,6.08C3.28,6.58 2,8.19 2,10A4,4 0 0,0 6,14H7.17C7.6,16.29 9.6,18 12,18C14.4,18 16.4,16.29 16.83,14H19A4,4 0 0,0 23,10A4,4 0 0,0 19,8M12,16A2,2 0 1,1 14,14A2,2 0 0,1 12,16Z" />
+                </svg>
+                Audit Results & Geographic Information Systems
+            </h2>
+            <div id="uiAiInsights" style="padding: 20px; display: flex; flex-direction: column;">
+                <h4 style="margin: 0 0 10px 0; color: var(--accent);">AI Consumption Analysis</h4>
+                <div id="aiSummaryText" style="font-size: 14px; color: var(--text-muted); margin-bottom: 25px; line-height: 1.6; background: var(--bg); padding: 15px; border-radius: 8px;"></div>
+                <h4 style="margin: 0 0 10px 0; color: var(--accent);">Billing Trend Graph</h4>
+                <div style="background: var(--surface); padding: 15px; border-radius: 8px;">
+                    <canvas id="billGraph" style="width: 100%; height: 250px;"></canvas>
+                </div>
             </div>
         </div>
 

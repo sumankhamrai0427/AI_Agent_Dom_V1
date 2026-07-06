@@ -54,6 +54,10 @@ def serve_screenshot(filename):
 def serve_report(filename):
     return controller.serve_report(filename)
 
+@app.route("/api/storage/download/reports/<path:filename>")
+def download_report(filename):
+    return controller.download_report(filename)
+
 # Create local storage folders on start
 os.makedirs("storage/screenshots", exist_ok=True)
 os.makedirs("storage/reports", exist_ok=True)

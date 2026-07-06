@@ -376,22 +376,33 @@ document.addEventListener("DOMContentLoaded", () => {
     function displayResults(task) {
         resultsSection.style.display = "block";
         
-        // Load GIS Interactive map
-        if (task.gis_data && task.gis_data.map_html_url) {
-            gisIframe.src = task.gis_data.map_html_url;
-        } else {
-            gisIframe.src = "";
-        }
+        // GIS map removed per user request
         
         // Configure report links
+        const viewHtml = document.getElementById('viewHtml');
         if (task.metadata.html_report) {
-            downloadHtml.href = `/api/storage/reports/${task.metadata.html_report.split(/[/\\]/).pop()}`;
-            downloadHtml.style.pointerEvents = "auto";
-            downloadHtml.style.opacity = "1";
+            const filename = task.metadata.html_report.split(/[/\\]/).pop();
+            if (viewHtml) {
+                viewHtml.href = `/api/storage/reports/${filename}`;
+                viewHtml.style.pointerEvents = "auto";
+                viewHtml.style.opacity = "1";
+            }
+            if (downloadHtml) {
+                downloadHtml.href = `/api/storage/download/reports/${filename}`;
+                downloadHtml.style.pointerEvents = "auto";
+                downloadHtml.style.opacity = "1";
+            }
         } else {
-            downloadHtml.href = "#";
-            downloadHtml.style.pointerEvents = "none";
-            downloadHtml.style.opacity = "0.5";
+            if (viewHtml) {
+                viewHtml.href = "#";
+                viewHtml.style.pointerEvents = "none";
+                viewHtml.style.opacity = "0.5";
+            }
+            if (downloadHtml) {
+                downloadHtml.href = "#";
+                downloadHtml.style.pointerEvents = "none";
+                downloadHtml.style.opacity = "0.5";
+            }
         }
         
         if (task.metadata.excel_report) {
@@ -412,6 +423,66 @@ document.addEventListener("DOMContentLoaded", () => {
             downloadGeoJson.href = "#";
             downloadGeoJson.style.pointerEvents = "none";
             downloadGeoJson.style.opacity = "0.5";
+        }
+        
+        // Handle AI Insights section
+        const insightsSectionWrapper = document.getElementById("insightsSectionWrapper");
+        if (task.metadata && task.metadata.ai_analysis && !task.metadata.ai_analysis.insufficient_data) {
+            if (insightsSectionWrapper) insightsSectionWrapper.style.display = "block";
+            
+            const aiData = task.metadata.ai_analysis;
+            
+            // Set Summary Text
+            const aiSummaryText = document.getElementById("aiSummaryText");
+            if(aiSummaryText) {
+                aiSummaryText.innerHTML = `
+                    <p style="margin-top: 0;"><b>Summary:</b> ${aiData.summary || "No summary available."}</p>
+                    <p style="margin-bottom: 0;"><b>Recommendation for Next Month:</b> ${aiData.recommendation || "No recommendations available."}</p>
+                `;
+            }
+            
+            // Render Graph
+            const labels = aiData.chart_labels ? [...aiData.chart_labels].reverse() : [];
+            const data = aiData.chart_data ? [...aiData.chart_data].reverse() : [];
+            
+            const ctx = document.getElementById('billGraph').getContext('2d');
+            if (window.billChart) {
+                window.billChart.destroy();
+            }
+            window.billChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Bill Amount (₹)',
+                        data: data,
+                        backgroundColor: 'rgba(56, 189, 248, 0.5)',
+                        borderColor: 'rgba(56, 189, 248, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    },
+                    plugins: {
+                        legend: { labels: { color: '#f8fafc' } }
+                    }
+                }
+            });
+            
+        } else {
+            if (insightsSectionWrapper) insightsSectionWrapper.style.display = "none";
         }
     }
 

@@ -295,20 +295,36 @@ class BrowserAgent:
                     try:
                         js_extract = """
                         () => {
-                            const rows = document.querySelectorAll('tr');
-                            for (const row of rows) {
+                            const tableRows = document.querySelectorAll('tr');
+                            let history = [];
+                            for (const row of tableRows) {
                                 const text = row.innerText || "";
-                                if ((text.includes('2025') || text.includes('2026') || text.includes('2024')) && !text.includes('Invoice')) {
-                                    const cells = Array.from(row.querySelectorAll('td')).map(c => c.innerText.trim());
-                                    if (cells.length >= 5) {
-                                        return {
-                                            bill_month: cells[1],
-                                            bill_amount: cells[3]
-                                        };
+                                if ((text.includes('2025') || text.includes('2026') || text.includes('2024') || text.includes('2023')) && !text.includes('Invoice')) {
+                                    const cells = Array.from(row.querySelectorAll('td'));
+                                    if (cells.length >= 6) {
+                                        // Attempt to get PDF action link from 6th column
+                                        let pdfLink = "";
+                                        let actionEl = cells[5].querySelector('a, img, button, input');
+                                        if (actionEl) {
+                                            pdfLink = actionEl.getAttribute('href') || actionEl.getAttribute('onclick') || "Interactive Action Available";
+                                        }
+                                        
+                                        history.push({
+                                            invoice_number: cells[0].innerText.trim(),
+                                            bill_month: cells[1].innerText.trim(),
+                                            bill_due_date: cells[2].innerText.trim(),
+                                            amount_before_due: cells[3].innerText.trim(),
+                                            amount_after_due: cells[4].innerText.trim(),
+                                            pdf_link: pdfLink
+                                        });
                                     }
                                 }
                             }
-                            return null;
+                            return {
+                                bill_history: history,
+                                bill_month: history.length > 0 ? history[0].bill_month : "",
+                                bill_amount: history.length > 0 ? history[0].amount_before_due : ""
+                            };
                         }
                         """
                         res_data = await page.evaluate(js_extract)
@@ -318,7 +334,8 @@ class BrowserAgent:
                                 "consumer_id": search_params.get("consumer_id"),
                                 "installation_no": search_params.get("installation_no"),
                                 "bill_amount": res_data.get("bill_amount"),
-                                "bill_month": res_data.get("bill_month")
+                                "bill_month": res_data.get("bill_month"),
+                                "bill_history": res_data.get("bill_history", [])
                             }
                             logger.info(f"Directly extracted bill details: {extracted_portal_data}")
                     except Exception as e:
@@ -330,7 +347,8 @@ class BrowserAgent:
                             "consumer_id": search_params.get("consumer_id") or "512016277",
                             "installation_no": search_params.get("installation_no") or "2646120",
                             "bill_amount": "766",
-                            "bill_month": "JUL,2026"
+                            "bill_month": "JUL,2026",
+                            "bill_history": []
                         }
                         logger.warning(f"Fallback to default values: {extracted_portal_data}")
                     

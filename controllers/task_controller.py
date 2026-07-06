@@ -109,6 +109,14 @@ class TaskController:
             os.path.join(root_path, "storage", "reports"),
             filename
         )
+        
+    def download_report(self, filename):
+        root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return send_from_directory(
+            os.path.join(root_path, "storage", "reports"),
+            filename,
+            as_attachment=True
+        )
             
     def cleanup(self):
         self.service.close()

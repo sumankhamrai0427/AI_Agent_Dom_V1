@@ -43,6 +43,21 @@ class PDFService:
                         log.status
                     ])
                 
+                # Sheet 3: Bill History
+                bill_history = data.get("portal", {}).get("bill_history", []) if isinstance(data.get("portal"), dict) else []
+                if bill_history:
+                    ws_history = wb.create_sheet(title="Bill History")
+                    ws_history.append(["Invoice Number", "Bill Month", "Due Date", "Amount Before Due", "Amount After Due", "PDF Link"])
+                    for bill in bill_history:
+                        ws_history.append([
+                            bill.get("invoice_number", ""),
+                            bill.get("bill_month", ""),
+                            bill.get("bill_due_date", ""),
+                            bill.get("amount_before_due", ""),
+                            bill.get("amount_after_due", ""),
+                            bill.get("pdf_link", "")
+                        ])
+                
                 wb.save(output_path)
                 logger.info(f"Excel report successfully generated: {output_path}")
                 return output_path
@@ -72,6 +87,22 @@ class PDFService:
                         log.result or "",
                         log.status
                     ])
+                
+                bill_history = data.get("portal", {}).get("bill_history", []) if isinstance(data.get("portal"), dict) else []
+                if bill_history:
+                    writer.writerow([])
+                    writer.writerow(["=== BILL HISTORY ==="])
+                    writer.writerow(["Invoice Number", "Bill Month", "Due Date", "Amount Before Due", "Amount After Due", "PDF Link"])
+                    for bill in bill_history:
+                        writer.writerow([
+                            bill.get("invoice_number", ""),
+                            bill.get("bill_month", ""),
+                            bill.get("bill_due_date", ""),
+                            bill.get("amount_before_due", ""),
+                            bill.get("amount_after_due", ""),
+                            bill.get("pdf_link", "")
+                        ])
+
             logger.info(f"CSV report successfully generated: {csv_path}")
             return csv_path
         except Exception as e:
@@ -181,6 +212,45 @@ class PDFService:
             <div class="card" style="border: 1px solid #A7F3D0; background-color: #ECFDF5; margin-bottom: 25px; display: flex; align-items: center; gap: 8px; color: #065F46; font-weight: 600; font-size: 14px; border-radius: 8px;">
                 <svg style="width:20px;height:20px;fill:#059669" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z"/></svg>
                 All records matched successfully with the government database. No conflicts found.
+            </div>
+            """
+
+        bill_history_html = ""
+        bill_history = data.get("portal", {}).get("bill_history", []) if isinstance(data.get("portal"), dict) else []
+        if bill_history:
+            bill_rows = ""
+            for bill in bill_history:
+                pdf_link = bill.get("pdf_link", "")
+                link_html = f'<a href="{pdf_link}" target="_blank" style="color: #4F46E5; text-decoration: none; font-weight: 600;">View PDF</a>' if pdf_link else 'N/A'
+                bill_rows += f"""
+                <tr>
+                    <td>{bill.get('invoice_number', '')}</td>
+                    <td>{bill.get('bill_month', '')}</td>
+                    <td>{bill.get('bill_due_date', '')}</td>
+                    <td>{bill.get('amount_before_due', '')}</td>
+                    <td>{bill.get('amount_after_due', '')}</td>
+                    <td>{link_html}</td>
+                </tr>
+                """
+            
+            bill_history_html = f"""
+            <div class="section-title">Historical Bills</div>
+            <div class="card" style="padding: 0; overflow-x: auto;">
+                <table style="margin-top: 0; width: 100%;">
+                    <thead>
+                        <tr>
+                            <th>Invoice Number</th>
+                            <th>Bill Month</th>
+                            <th>Due Date</th>
+                            <th>Amt (Before Due)</th>
+                            <th>Amt (After Due)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {bill_rows}
+                    </tbody>
+                </table>
             </div>
             """
 
@@ -307,6 +377,8 @@ class PDFService:
                         {portal_table_html}
                     </div>
                 </div>
+
+                {bill_history_html}
 
                 {f'''
                 <div class="section-title">GIS Plot Boundary Details</div>
