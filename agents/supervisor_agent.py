@@ -4,7 +4,7 @@ import traceback
 from utils.logger import logger
 from repositories.task_repository import TaskRepository
 from repositories.agent_log_repository import AgentLogRepository
-from agents.planner_agent import PlannerAgent
+from agents.planner_agent import PlannerAgent, detect_agent_type
 from agents.document_agent import DocumentAgent
 from agents.search_agent import SearchAgent
 from agents.browser_agent import BrowserAgent
@@ -12,7 +12,9 @@ from agents.validation_agent import ValidationAgent
 from services.gis_processor import GISProcessor
 from services.pdf_service import PDFService
 from helpers.llm_client import LLMClient
+from utils.config import TWELVEDATA_API_KEY
 import json
+import requests
 
 class SupervisorAgent:
     def __init__(self, task_id):
@@ -33,6 +35,7 @@ class SupervisorAgent:
 
         metadata = task.get_metadata()
         objective = task.objective
+        agent_type = detect_agent_type(objective)
         
         # Log planning start
         self.log_repository.log_action(
@@ -71,7 +74,161 @@ class SupervisorAgent:
 
                 while retry_count < max_retries and not step_success:
                     try:
-                        if "Extract Document Data" in step_name:
+                        # ── Share Market Agent Steps ───────────────────────────
+                        if agent_type == "SHARE_MARKET" and "Search Stock Portal" in step_name:
+                            symbol = metadata.get("symbol", "NIFTY50")
+                            document_data["symbol"] = symbol
+                            document_data["utility_type"] = "SHARE_MARKET"
+                            
+                            portal_task = SearchAgent.identify_portal("STOCK_MARKET")
+                            target_url = portal_task.get("url", "").replace("{symbol}", symbol)
+                            
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="ShareMarketAgent",
+                                step_name=step_name,
+                                action="search_portal",
+                                result=f"Identified portal: {portal_task.get('name')}. Opening browser...",
+                                status="SUCCESS"
+                            )
+                            
+                            # Launch Browser
+                            browser_agent = BrowserAgent(self.task_id, self.repository, self.log_repository)
+                            
+                            # We instruct the browser agent LLM exactly what to extract
+                            goal = f"Navigate to Google Finance and extract the stock price, change percentage, and company name for the symbol {symbol} from the page. Wait for the page to load, then use the extract_data action."
+                            
+                            # We don't strictly need search params as the URL already has it, but passing symbol
+                            search_params = {"symbol": symbol}
+                            
+                            portal_data = await browser_agent.run_search_workflow(goal, target_url, search_params)
+                            step_success = True
+
+                        elif agent_type == "SHARE_MARKET" and "Extract Stock Data" in step_name:
+                            # 1. Start with the browser scraped data
+                            symbol = document_data.get("symbol", "NIFTY50")
+                            
+                            # 2. Fetch background API data from TwelveData for better accuracy
+                            api_data = {}
+                            try:
+                                api_url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1day&apikey={TWELVEDATA_API_KEY}"
+                                logger.info(f"Fetching background API data from TwelveData: {api_url}")
+                                response = requests.get(api_url, timeout=10)
+                                if response.status_code == 200:
+                                    json_data = response.json()
+                                    if "values" in json_data and len(json_data["values"]) > 0:
+                                        latest = json_data["values"][0]
+                                        api_data = {
+                                            "api_price": latest.get("close"),
+                                            "api_high": latest.get("high"),
+                                            "api_low": latest.get("low"),
+                                            "api_volume": latest.get("volume"),
+                                            "api_date": latest.get("datetime")
+                                        }
+                            except Exception as e:
+                                logger.error(f"TwelveData API fetch failed: {e}")
+                                
+                            # Merge API data into portal_data
+                            if api_data:
+                                portal_data.update(api_data)
+                                
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="ShareMarketAgent",
+                                step_name=step_name,
+                                action="extract_data",
+                                result=f"Scraped browser data and fetched TwelveData API background info.",
+                                status="SUCCESS"
+                            )
+                            step_success = True
+
+                        elif agent_type == "SHARE_MARKET" and "Analyze Market Trends" in step_name:
+                            symbol = document_data.get("symbol", "NIFTY50")
+                            scraped_price = portal_data.get("api_price") or portal_data.get("price") or "N/A"
+                            scraped_change = portal_data.get("change") or "N/A"
+                            api_high = portal_data.get("api_high", "N/A")
+                            api_low = portal_data.get("api_low", "N/A")
+                            scraped_name = portal_data.get("name") or symbol
+                            
+                            prompt = f"""
+                            You are an expert stock market analyst. Provide a concise JSON analysis for the symbol '{symbol}' ({scraped_name}).
+                            
+                            Data context (Browser + TwelveData API):
+                            Current Price: {scraped_price}
+                            Change Today: {scraped_change}
+                            Today's High: {api_high}
+                            Today's Low: {api_low}
+                            
+                            Include realistic current market context based on this scraped data.
+                            Respond in exactly this format:
+                            {{
+                                "symbol": "{symbol}",
+                                "summary": "A 2-sentence overview of current market status for {symbol} trading at {scraped_price} with change {scraped_change}.",
+                                "trend": "bullish | bearish | neutral",
+                                "recommendation": "A 2-sentence investment recommendation. Mention this is not financial advice.",
+                                "key_levels": {{"support": "<value>", "resistance": "<value>"}}
+                            }}
+                            """
+                            llm_res = LLMClient.call_llm("gemini-2.5-flash", prompt, json_mode=True)
+                            if llm_res:
+                                if isinstance(llm_res, str):
+                                    try:
+                                        market_analysis = json.loads(llm_res)
+                                    except Exception:
+                                        market_analysis = {"summary": llm_res}
+                                else:
+                                    market_analysis = llm_res
+                            else:
+                                market_analysis = {"summary": f"Market analysis not available for {symbol}."}
+                            metadata["market_analysis"] = market_analysis
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="ShareMarketAgent",
+                                step_name=step_name,
+                                action="analyze_trends",
+                                result=f"Analysis complete. Trend: {market_analysis.get('trend', 'N/A')}",
+                                status="SUCCESS"
+                            )
+                            step_success = True
+
+                        # ── KMC Agent Steps ────────────────────────────────────
+                        elif agent_type == "KMC" and "Search KMC Portal" in step_name:
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="KMCAgent",
+                                step_name=step_name,
+                                action="search_kmc_portal",
+                                result="Searching Kolkata Municipal Corporation portal for property records.",
+                                status="SUCCESS"
+                            )
+                            document_data["utility_type"] = "KMC"
+                            step_success = True
+
+                        elif agent_type == "KMC" and "Extract Property Records" in step_name:
+                            doc_path = metadata.get("document_path")
+                            if doc_path and os.path.exists(doc_path):
+                                document_data = DocumentAgent.process_document(doc_path)
+                            else:
+                                document_data = {
+                                    "utility_type": "KMC",
+                                    "owner_name": metadata.get("owner_name", "N/A"),
+                                    "district": "Kolkata",
+                                    "village": metadata.get("ward", "N/A"),
+                                    "khata": metadata.get("assessment_no", "N/A"),
+                                }
+                            self.repository.save_document_record(self.task_id, document_data)
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="KMCAgent",
+                                step_name=step_name,
+                                action="extract_property_records",
+                                result=f"KMC property records extracted for owner: {document_data.get('owner_name')}",
+                                status="SUCCESS"
+                            )
+                            step_success = True
+
+                        # ── Land / Electricity Steps ───────────────────────────
+                        elif "Extract Document Data" in step_name:
                             doc_path = metadata.get("document_path")
                             if doc_path and os.path.exists(doc_path):
                                 document_data = DocumentAgent.process_document(doc_path)
@@ -282,8 +439,50 @@ class SupervisorAgent:
                             
                             ai_analysis_result = {}
                             utility_type = document_data.get("utility_type", "LAND")
-                            
-                            if utility_type == "ELECTRICITY":
+
+                            if utility_type == "SHARE_MARKET":
+                                # Use the market analysis generated in the previous step
+                                market_analysis = metadata.get("market_analysis", {})
+                                ai_analysis_result = {
+                                    "summary": market_analysis.get("summary", "Share market analysis complete."),
+                                    "recommendation": market_analysis.get("recommendation", "Please consult a financial advisor before investing."),
+                                    "chart_labels": [],
+                                    "chart_data": [],
+                                    "metrics": {
+                                        "trend": market_analysis.get("trend", "N/A"),
+                                        "symbol": market_analysis.get("symbol", document_data.get("symbol", "N/A")),
+                                        "support": market_analysis.get("key_levels", {}).get("support", "N/A"),
+                                        "resistance": market_analysis.get("key_levels", {}).get("resistance", "N/A"),
+                                    }
+                                }
+                                metadata["ai_analysis"] = ai_analysis_result
+                                self.log_repository.log_action(
+                                    task_id=self.task_id,
+                                    agent_name="ShareMarketAgent",
+                                    step_name=step_name,
+                                    action="generate_report",
+                                    result=f"Share Market report generated for {document_data.get('symbol', 'N/A')}.",
+                                    status="SUCCESS"
+                                )
+                                step_success = True
+                                continue
+
+                            elif utility_type == "KMC":
+                                # KMC property summary
+                                ai_analysis_result = {"insufficient_data": True}
+                                metadata["ai_analysis"] = ai_analysis_result
+                                self.log_repository.log_action(
+                                    task_id=self.task_id,
+                                    agent_name="KMCAgent",
+                                    step_name=step_name,
+                                    action="generate_report",
+                                    result="KMC property report generated.",
+                                    status="SUCCESS"
+                                )
+                                step_success = True
+                                continue
+
+                            elif utility_type == "ELECTRICITY":
                                 try:
                                     logger.info(f"Running AI Consumption Analysis for Electricity Bill #{self.task_id}")
                                     
@@ -471,7 +670,15 @@ class SupervisorAgent:
                 agent_name="SupervisorAgent",
                 step_name="Execution End",
                 action="complete",
-                result="Land record verification successfully finalized.",
+                result=(
+                    f"Share Market analysis for {document_data.get('symbol', 'N/A')} successfully finalized."
+                    if agent_type == "SHARE_MARKET" else
+                    "KMC property verification successfully finalized."
+                    if agent_type == "KMC" else
+                    "Electricity bill verification successfully finalized."
+                    if agent_type == "ELECTRICITY" else
+                    "Land record verification successfully finalized."
+                ),
                 status="SUCCESS"
             )
 

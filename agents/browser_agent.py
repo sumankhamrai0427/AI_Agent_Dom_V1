@@ -369,7 +369,9 @@ class BrowserAgent:
                 elif self.just_resumed:
                     logger.info("Just resumed from CAPTCHA pause. Skipping CAPTCHA check for this step to allow action execution.")
                     self.just_resumed = False
-                elif await PageObserver.detect_captcha(page):
+                
+                should_pause_captcha = False
+                if not self.just_resumed and await PageObserver.detect_captcha(page):
                     # For electricity bills, only pause if we have already filled the IDs
                     is_electricity = (search_params.get("consumer_id") is not None)
                     if is_electricity:
@@ -464,6 +466,8 @@ class BrowserAgent:
                 memory_summary = self.memory.get_memory_summary()
                 
                 is_electricity = (search_params.get("consumer_id") is not None)
+                is_share_market = (search_params.get("symbol") is not None)
+                
                 if is_electricity:
                     extracted_record_schema = """"extracted_record": {
                            "owner_name": "Customer Name from page",
@@ -473,6 +477,13 @@ class BrowserAgent:
                            "bill_month": "Bill Month (e.g. JUL,2026)"
                         }"""
                     output_instructions = "If you have reached the output page and see the bill details (Consumer Bill Details table), you must select \"action\": \"extract_data\" and output the details."
+                elif is_share_market:
+                    extracted_record_schema = """"extracted_record": {
+                           "name": "Company Name from page",
+                           "price": "Current stock price",
+                           "change": "Price change and percentage"
+                        }"""
+                    output_instructions = "If you see the stock price, company name, and price change on the screen, you must select \"action\": \"extract_data\" and output the details."
                 else:
                     extracted_record_schema = """"extracted_record": {
                            "owner_name": "Owner Name from page",

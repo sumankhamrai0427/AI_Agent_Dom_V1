@@ -54,6 +54,15 @@ PORTAL_MAPPING = {
             "captcha_input": "input[id='BIEI.WBViewBillWLCompView.InputField2']",
             "search_btn": "[id='BIEI.WBViewBillWLCompView.Button']"
         }
+    },
+    "STOCK_MARKET": {
+        "name": "Google Finance",
+        "url": "https://www.google.com/finance/quote/{symbol}:NSE",
+        "selectors": {
+            "price": "div.YMlKec.fxKbKc",
+            "change": "div.P6K39c",
+            "name": "div.zzDege"
+        }
     }
 }
 
@@ -77,6 +86,7 @@ def get_portal_config(state):
 # API Keys
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY", "demo")
 
 # Local Mistral configs
 ACTIVE_LLM = os.getenv("ACTIVE_LLM", "gemini")

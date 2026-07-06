@@ -64,8 +64,75 @@ document.addEventListener("DOMContentLoaded", () => {
         selectedAgent = agentName;
         addChatMessage('user', agentName);
         
-        // Remove options from previous message if desired, or just continue
         setTimeout(() => {
+            // Share Market Agent: ask for symbol, no file upload needed
+            if (agentName === "Share Market Agent") {
+                const inputHtml = `
+                    Please enter a stock/index symbol for market analysis.
+                    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+                        <input id="stockSymbolInput" type="text" placeholder="e.g. RELIANCE, NIFTY50, TCS, INFOSYS"
+                            style="width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+                            color:#FFF; padding:12px 16px; border-radius:10px; font-family:inherit; font-size:15px; outline:none;
+                            transition:all 0.3s ease;" />
+                        <button id="submitSymbolBtn"
+                            style="background:linear-gradient(135deg,#6366F1 0%,#4F46E5 100%); color:#FFF; border:none;
+                            padding:12px; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer;
+                            box-shadow:0 4px 15px rgba(99,102,241,0.4); transition:all 0.3s ease;">
+                            🔍 Analyse Market
+                        </button>
+                    </div>
+                `;
+                addChatMessage('bot', inputHtml, true);
+                setTimeout(() => {
+                    const btn = document.getElementById("submitSymbolBtn");
+                    const inp = document.getElementById("stockSymbolInput");
+                    if (btn && inp) {
+                        btn.addEventListener("click", () => {
+                            const symbol = inp.value.trim().toUpperCase() || "NIFTY50";
+                            submitShareMarketTask(symbol);
+                        });
+                        inp.addEventListener("keydown", (e) => {
+                            if (e.key === "Enter") {
+                                const symbol = inp.value.trim().toUpperCase() || "NIFTY50";
+                                submitShareMarketTask(symbol);
+                            }
+                        });
+                    }
+                }, 100);
+                return;
+            }
+
+            // Kolkata Municipal Corporation: ask for Assessment Number
+            if (agentName === "Kolkata Municipal Corporation") {
+                const inputHtml = `
+                    Please enter the KMC Assessment Number or Ward Number.
+                    <div style="margin-top:12px; display:flex; flex-direction:column; gap:10px;">
+                        <input id="kmcAssessInput" type="text" placeholder="e.g. WARD-15 / 123456"
+                            style="width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15);
+                            color:#FFF; padding:12px 16px; border-radius:10px; font-family:inherit; font-size:15px; outline:none;" />
+                        <button id="submitKmcBtn"
+                            style="background:linear-gradient(135deg,#10B981 0%,#059669 100%); color:#FFF; border:none;
+                            padding:12px; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer;
+                            box-shadow:0 4px 15px rgba(16,185,129,0.4); transition:all 0.3s ease;">
+                            🏛️ Search KMC Records
+                        </button>
+                    </div>
+                `;
+                addChatMessage('bot', inputHtml, true);
+                setTimeout(() => {
+                    const btn = document.getElementById("submitKmcBtn");
+                    const inp = document.getElementById("kmcAssessInput");
+                    if (btn && inp) {
+                        btn.addEventListener("click", () => {
+                            const assessNo = inp.value.trim() || "N/A";
+                            submitKmcTask(assessNo);
+                        });
+                    }
+                }, 100);
+                return;
+            }
+
+            // Land / Electricity: standard file upload
             const uploadHtml = `
                 Please upload the relevant document for the ${agentName}.
                 <div class="chat-file-upload">
@@ -89,6 +156,68 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             });
         }, 500);
+    }
+
+    // Submit Share Market task (no file needed)
+    async function submitShareMarketTask(symbol) {
+        addChatMessage('user', `Analysing: ${symbol}`);
+        addChatMessage('bot', `Starting Share Market Agent for ${symbol}...`);
+        document.getElementById("liveAgentConsole").style.display = "block";
+        logTerminal.innerHTML = "";
+        loggedTimestamps.clear();
+        addTerminalLine("Aetheris", `Initializing Share Market Agent for symbol: ${symbol}`, "info");
+
+        const formData = new FormData();
+        formData.append("objective", `Agent Task: share market stock equity analysis for ${symbol}`);
+        formData.append("symbol", symbol);
+
+        try {
+            const response = await fetch("/api/tasks", { method: "POST", body: formData });
+            const data = await response.json();
+            if (data.success) {
+                currentTaskId = data.task_id;
+                consoleTaskId.textContent = `Task ID: #${currentTaskId}`;
+                addTerminalLine("Supervisor", `Task created successfully. ID: #${currentTaskId}`, "success");
+                resultsSection.style.display = "none";
+                await loadTaskHistory();
+                fetchTaskState(currentTaskId);
+            } else {
+                addTerminalLine("SystemError", `Failed to initiate task: ${data.error}`, "error");
+            }
+        } catch (error) {
+            addTerminalLine("SystemError", `API connection failed: ${error.message}`, "error");
+        }
+    }
+
+    // Submit KMC task
+    async function submitKmcTask(assessNo) {
+        addChatMessage('user', `KMC Assessment: ${assessNo}`);
+        addChatMessage('bot', `Starting Kolkata Municipal Corporation Agent...`);
+        document.getElementById("liveAgentConsole").style.display = "block";
+        logTerminal.innerHTML = "";
+        loggedTimestamps.clear();
+        addTerminalLine("Aetheris", `Initializing KMC Agent for assessment: ${assessNo}`, "info");
+
+        const formData = new FormData();
+        formData.append("objective", `Agent Task: kolkata municipal corporation kmc property search ${assessNo}`);
+        formData.append("assessment_no", assessNo);
+
+        try {
+            const response = await fetch("/api/tasks", { method: "POST", body: formData });
+            const data = await response.json();
+            if (data.success) {
+                currentTaskId = data.task_id;
+                consoleTaskId.textContent = `Task ID: #${currentTaskId}`;
+                addTerminalLine("Supervisor", `Task created successfully. ID: #${currentTaskId}`, "success");
+                resultsSection.style.display = "none";
+                await loadTaskHistory();
+                fetchTaskState(currentTaskId);
+            } else {
+                addTerminalLine("SystemError", `Failed to initiate task: ${data.error}`, "error");
+            }
+        } catch (error) {
+            addTerminalLine("SystemError", `API connection failed: ${error.message}`, "error");
+        }
     }
 
     async function submitTask(file) {
@@ -145,13 +274,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     socket.on("log_added", (log) => {
         if (currentTaskId && log.task_id === currentTaskId) {
-            const logSignature = `${log.timestamp || new Date().toISOString()}_${log.agent_name}_${log.action}`;
+            // Use stable key: agent+action+result (same as processLogs) to prevent duplicates
+            const resultSnippet = (log.result || log.error_message || log.action || "").slice(0, 60);
+            const logSignature = `${log.agent_name}_${log.action}_${resultSnippet}`;
             if (!loggedTimestamps.has(logSignature)) {
                 loggedTimestamps.add(logSignature);
                 
                 let lineType = "info";
                 if (log.status === "FAILURE") lineType = "error";
                 else if (log.status === "WARNING") lineType = "warning";
+                else if (log.status === "SUCCESS") lineType = "success";
                 
                 const msg = log.result || log.error_message || `Executing: ${log.action}`;
                 addTerminalLine(log.agent_name, msg, lineType);
@@ -269,8 +401,9 @@ document.addEventListener("DOMContentLoaded", () => {
         let latestScreenshot = null;
         
         logs.forEach(log => {
-            // Generate unique log signature based on time, agent, and result
-            const logSignature = `${log.timestamp}_${log.agent_name}_${log.action}`;
+            // Use stable key matching the socket.io handler (no timestamp)
+            const resultSnippet = (log.result || log.error_message || log.action || "").slice(0, 60);
+            const logSignature = `${log.agent_name}_${log.action}_${resultSnippet}`;
             
             if (!loggedTimestamps.has(logSignature)) {
                 loggedTimestamps.add(logSignature);
@@ -280,6 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 let lineType = "info";
                 if (log.status === "FAILURE") lineType = "error";
                 else if (log.status === "WARNING") lineType = "warning";
+                else if (log.status === "SUCCESS") lineType = "success";
                 
                 const msg = log.result || log.error_message || `Executing: ${log.action}`;
                 addTerminalLine(log.agent_name, msg, lineType, timeStr);
@@ -427,8 +561,25 @@ document.addEventListener("DOMContentLoaded", () => {
         
         // Handle AI Insights section
         const insightsSectionWrapper = document.getElementById("insightsSectionWrapper");
+        const aiSectionTitle = document.getElementById("aiSectionTitle");
+        const aiConsumptionTitle = document.getElementById("aiConsumptionTitle");
+        const billingTrendTitle = document.getElementById("billingTrendTitle");
+        const billGraphContainer = document.getElementById("billGraphContainer");
+        
         if (task.metadata && task.metadata.ai_analysis && !task.metadata.ai_analysis.insufficient_data) {
             if (insightsSectionWrapper) insightsSectionWrapper.style.display = "block";
+            
+            // Adjust titles for Share Market
+            const isShareMarket = task.document && task.document.utility_type === "SHARE_MARKET";
+            if (isShareMarket) {
+                if (aiSectionTitle) aiSectionTitle.innerHTML = `<svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24"><path d="M16 11.78L20.24 4.45L21.97 5.45L16.74 14.5L10.23 10.75L5.46 19H22V21H2V3H4V17.54L11.27 7.5L16 11.78Z"/></svg> Share Market Analysis & Real-time Trends`;
+                if (aiConsumptionTitle) aiConsumptionTitle.innerText = "Market Analysis";
+                if (billingTrendTitle) billingTrendTitle.innerText = "Market Trend Graph";
+            } else {
+                if (aiSectionTitle) aiSectionTitle.innerHTML = `<svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24"><path d="M15,21H9V20H15V21M19,8H17.73C17.38,5.68 15.39,4 13,4C12.33,4 11.68,4.13 11.08,4.37C10.58,3.5 9.61,3 8.5,3C6.7,3 5.25,4.34 5.04,6.08C3.28,6.58 2,8.19 2,10A4,4 0 0,0 6,14H7.17C7.6,16.29 9.6,18 12,18C14.4,18 16.4,16.29 16.83,14H19A4,4 0 0,0 23,10A4,4 0 0,0 19,8M12,16A2,2 0 1,1 14,14A2,2 0 0,1 12,16Z" /></svg> Audit Results & Geographic Information Systems`;
+                if (aiConsumptionTitle) aiConsumptionTitle.innerText = "AI Consumption Analysis";
+                if (billingTrendTitle) billingTrendTitle.innerText = "Billing Trend Graph";
+            }
             
             const aiData = task.metadata.ai_analysis;
             
@@ -444,6 +595,14 @@ document.addEventListener("DOMContentLoaded", () => {
             // Render Graph
             const labels = aiData.chart_labels ? [...aiData.chart_labels].reverse() : [];
             const data = aiData.chart_data ? [...aiData.chart_data].reverse() : [];
+            
+            if (labels.length === 0 || data.length === 0) {
+                if (billGraphContainer) billGraphContainer.style.display = "none";
+                if (billingTrendTitle) billingTrendTitle.style.display = "none";
+            } else {
+                if (billGraphContainer) billGraphContainer.style.display = "block";
+                if (billingTrendTitle) billingTrendTitle.style.display = "block";
+            }
             
             const ctx = document.getElementById('billGraph').getContext('2d');
             if (window.billChart) {

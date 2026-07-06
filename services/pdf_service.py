@@ -116,8 +116,15 @@ class PDFService:
         
         # Determine utility type
         utility_type = data.get("document", {}).get("utility_type", "LAND")
-        report_title = "Electricity Bill Verification Report" if utility_type == "ELECTRICITY" else "Land Record Verification Report"
-        document_card_title = "Extracted Customer Bill (PDF/OCR)" if utility_type == "ELECTRICITY" else "Extracted Owner Deed (PDF/OCR)"
+        if utility_type == "ELECTRICITY":
+            report_title = "Electricity Bill Verification Report"
+            document_card_title = "Extracted Customer Bill (PDF/OCR)"
+        elif utility_type == "SHARE_MARKET":
+            report_title = "Share Market Analysis Report"
+            document_card_title = "Target Stock Info"
+        else:
+            report_title = "Land Record Verification Report"
+            document_card_title = "Extracted Owner Deed (PDF/OCR)"
         
         # Parse verification conflicts or status
         is_valid = data.get("verification", {}).get("is_valid", True)
@@ -148,6 +155,13 @@ class PDFService:
                 <tr><td>Bill Month</td><td>{data.get('document', {}).get('bill_month', 'N/A')}</td></tr>
             </table>
             """
+        elif utility_type == "SHARE_MARKET":
+            doc_table_html = f"""
+            <table style="margin-top:0;">
+                <tr><td>Target Symbol</td><td><b>{data.get('document', {}).get('symbol', 'N/A')}</b></td></tr>
+                <tr><td>Task Objective</td><td>Market Analysis & Trend Prediction</td></tr>
+            </table>
+            """
         else:
             doc_table_html = f"""
             <table style="margin-top:0;">
@@ -169,6 +183,16 @@ class PDFService:
                     <tr><td>Installation ID</td><td>{data.get('portal', {}).get('installation_no', 'N/A')}</td></tr>
                     <tr><td>Bill Amount</td><td>{data.get('portal', {}).get('bill_amount', 'N/A')}</td></tr>
                     <tr><td>Bill Month</td><td>{data.get('portal', {}).get('bill_month', 'N/A')}</td></tr>
+                </table>
+                """
+            elif utility_type == "SHARE_MARKET":
+                portal_table_html = f"""
+                <table style="margin-top:0;">
+                    <tr><td>Company Name</td><td><b>{data.get('portal', {}).get('name', 'N/A')}</b></td></tr>
+                    <tr><td>Current Price</td><td>{data.get('portal', {}).get('api_price') or data.get('portal', {}).get('price', 'N/A')}</td></tr>
+                    <tr><td>Today's Change</td><td>{data.get('portal', {}).get('change', 'N/A')}</td></tr>
+                    <tr><td>Today's High</td><td>{data.get('portal', {}).get('api_high', 'N/A')}</td></tr>
+                    <tr><td>Today's Low</td><td>{data.get('portal', {}).get('api_low', 'N/A')}</td></tr>
                 </table>
                 """
             else:

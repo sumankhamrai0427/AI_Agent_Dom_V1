@@ -18,6 +18,8 @@ class TaskController:
             village = request.form.get("village", "").strip()
             khata = request.form.get("khata", "").strip()
             owner_name = request.form.get("owner_name", "").strip()
+            symbol = request.form.get("symbol", "").strip().upper()
+            assessment_no = request.form.get("assessment_no", "").strip()
             
             if not objective:
                 objective = f"Verify Land Ownership Deed for Khata {khata} in Village {village}, {district}, {state}."
@@ -28,6 +30,8 @@ class TaskController:
                 "village": village,
                 "khata": khata,
                 "owner_name": owner_name,
+                "symbol": symbol or None,
+                "assessment_no": assessment_no or None,
                 "document_path": None
             }
 

@@ -70,7 +70,7 @@ class ActionExecutor:
             if action_name == "navigate":
                 if not value:
                     raise ValueError("Navigation URL value is required.")
-                await page.goto(value, wait_until="domcontentloaded", timeout=30000)
+                await page.goto(value, wait_until="domcontentloaded", timeout=60000)
                 success = True
                 
             elif action_name == "click":

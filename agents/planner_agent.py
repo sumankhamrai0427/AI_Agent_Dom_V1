@@ -2,11 +2,52 @@ import json
 from helpers.llm_client import LLMClient
 from utils.logger import logger
 
+# Agent type keyword detection
+SHARE_MARKET_KEYWORDS = ["share market", "stock", "nse", "bse", "equity", "trading"]
+KMC_KEYWORDS = ["kolkata municipal", "kmc", "municipality"]
+ELECTRICITY_KEYWORDS = ["electricity", "electric bill", "wbsedcl", "power bill"]
+LAND_KEYWORDS = ["land", "deed", "khata", "khasra", "bhumi", "ownership"]
+
+
+def detect_agent_type(objective: str) -> str:
+    """Detect the agent type from the task objective string."""
+    obj_lower = objective.lower()
+    if any(kw in obj_lower for kw in SHARE_MARKET_KEYWORDS):
+        return "SHARE_MARKET"
+    if any(kw in obj_lower for kw in KMC_KEYWORDS):
+        return "KMC"
+    if any(kw in obj_lower for kw in ELECTRICITY_KEYWORDS):
+        return "ELECTRICITY"
+    return "LAND"
+
+
 class PlannerAgent:
     @staticmethod
     def create_plan(objective):
         logger.info(f"Planner Agent generating execution plan for objective: '{objective}'")
-        
+
+        agent_type = detect_agent_type(objective)
+        logger.info(f"Detected agent type: {agent_type}")
+
+        # --- Share Market Agent: fixed lightweight plan ---
+        if agent_type == "SHARE_MARKET":
+            return [
+                {"id": 1, "task": "Search Stock Portal", "status": "PENDING"},
+                {"id": 2, "task": "Extract Stock Data", "status": "PENDING"},
+                {"id": 3, "task": "Analyze Market Trends", "status": "PENDING"},
+                {"id": 4, "task": "Generate Final Report", "status": "PENDING"},
+            ]
+
+        # --- Kolkata Municipal Corporation Agent: fixed plan ---
+        if agent_type == "KMC":
+            return [
+                {"id": 1, "task": "Search KMC Portal", "status": "PENDING"},
+                {"id": 2, "task": "Extract Property Records", "status": "PENDING"},
+                {"id": 3, "task": "Verify Findings", "status": "PENDING"},
+                {"id": 4, "task": "Generate Final Report", "status": "PENDING"},
+            ]
+
+        # --- Land / Electricity: standard LLM-driven plan ---
         system_instruction = """
         You are a Senior Planner Agent. Analyze the user's objective and break it down into sequential, atomic tasks.
         You MUST select your descriptive step names ("task") ONLY from the following list of standard workflow steps:
