@@ -488,9 +488,21 @@ class SupervisorAgent:
                                     
                                     # Extract values
                                     current_amount = float(str(document_data.get("bill_amount", 0)).replace(',', '').replace('₹', '').strip() or 0)
-                                    past_billing = portal_data.get("bill_history", [])
+                                    raw_past_billing = portal_data.get("bill_history", [])
                                     
-                                    # Fallback mock data for demo purposes if not scraped from portal
+                                    # Validate past billing data
+                                    past_billing = []
+                                    if raw_past_billing:
+                                        for bill in raw_past_billing:
+                                            amt_val = bill.get("amount_before_due") or bill.get("amount", "")
+                                            amt_str = str(amt_val).replace(',', '').replace('₹', '').strip()
+                                            try:
+                                                if float(amt_str) > 0:
+                                                    past_billing.append(bill)
+                                            except:
+                                                pass
+                                    
+                                    # Fallback mock data for demo purposes if not scraped from portal or all invalid
                                     if not past_billing and current_amount > 0:
                                         import random
                                         import datetime
@@ -503,9 +515,17 @@ class SupervisorAgent:
                                             fluctuation = random.uniform(0.85, 1.15)
                                             past_amount = round(current_amount * fluctuation)
                                             past_billing.append({
-                                                "month": past_date.strftime("%b %Y"),
-                                                "amount": str(past_amount)
+                                                "bill_month": past_date.strftime("%b %Y"),
+                                                "amount_before_due": str(past_amount),
+                                                "amount": str(past_amount),
+                                                "invoice_number": f"INV-{random.randint(1000, 9999)}",
+                                                "bill_due_date": (past_date + datetime.timedelta(days=15)).strftime("%d %b %Y"),
+                                                "amount_after_due": str(past_amount + 50),
+                                                "pdf_link": "#"
                                             })
+                                            
+                                        # Note: We intentionally DO NOT save this mock data back into portal_data
+                                        # so the PDF/HTML View Report remains strictly 100% authentic to the website.
                                             
                                     if past_billing:
                                         # Parse historical amounts for chart
@@ -531,14 +551,27 @@ class SupervisorAgent:
                                             except ValueError:
                                                 continue
                                         
-                                        # Add current bill if month available
+                                        # Ensure we don't duplicate the current bill if it's already in the historical list
                                         current_month = document_data.get("bill_month", "Current")
-                                        chart_labels.insert(0, current_month)
-                                        chart_data.insert(0, current_amount)
-                                        
+                                        if len(chart_labels) > 0 and current_month not in chart_labels[0:2]:
+                                            # Only insert if the portal data didn't already include the current month
+                                            chart_labels.insert(0, current_month)
+                                            chart_data.insert(0, current_amount)
+                                        elif len(chart_labels) == 0:
+                                            chart_labels.insert(0, current_month)
+                                            chart_data.insert(0, current_amount)
+                                            
                                         # Calculate metrics
-                                        avg_past = total_past_amount / count_past if count_past > 0 else 0
-                                        diff = current_amount - avg_past
+                                        # Use the first element of past_amounts as current_amount if we didn't insert it
+                                        actual_current_amount = chart_data[0] if len(chart_data) > 0 else current_amount
+                                        
+                                        # For average, exclude the first item since it is the "current" month
+                                        historical_only_amounts = chart_data[1:] if len(chart_data) > 1 else chart_data
+                                        count_historical = len(historical_only_amounts)
+                                        total_historical = sum(historical_only_amounts)
+                                        
+                                        avg_past = total_historical / count_historical if count_historical > 0 else 0
+                                        diff = actual_current_amount - avg_past
                                         trend = "increased" if diff > 0 else "decreased" if diff < 0 else "stable"
                                         
                                         max_past = max(past_amounts) if past_amounts else 0
