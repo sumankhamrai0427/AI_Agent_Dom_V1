@@ -58,6 +58,14 @@ def serve_report(filename):
 def download_report(filename):
     return controller.download_report(filename)
 
+@app.route("/api/storage/uploads/<path:filename>")
+def serve_upload(filename):
+    return controller.serve_upload(filename)
+
+@app.route("/api/storage/historical_bills/<path:filename>")
+def serve_historical_bill(filename):
+    return controller.serve_historical_bill(filename)
+
 # Create local storage folders on start
 os.makedirs("storage/screenshots", exist_ok=True)
 os.makedirs("storage/reports", exist_ok=True)

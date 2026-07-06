@@ -118,5 +118,19 @@ class TaskController:
             as_attachment=True
         )
             
+    def serve_upload(self, filename):
+        root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return send_from_directory(
+            os.path.join(root_path, "storage", "uploads"),
+            filename
+        )
+        
+    def serve_historical_bill(self, filename):
+        root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        return send_from_directory(
+            os.path.join(root_path, "storage", "reports", "historical_bills"),
+            filename
+        )
+            
     def cleanup(self):
         self.service.close()
