@@ -1,7 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const taskForm = document.getElementById("taskForm");
-    const deedFileInput = document.getElementById("deed_file");
-    const fileLabel = document.getElementById("fileLabel");
+    const chatHistory = document.getElementById("chatHistory");
     
     const consoleTaskId = document.getElementById("consoleTaskId");
     const consoleStep = document.getElementById("consoleStep");
@@ -23,34 +21,92 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let currentTaskId = null;
     let loggedTimestamps = new Set();
+    let selectedAgent = null;
 
-    // 1. File Upload styling update
-    deedFileInput.addEventListener("change", (e) => {
-        if (e.target.files.length > 0) {
-            fileLabel.textContent = `File Selected: ${e.target.files[0].name}`;
-            fileLabel.style.color = "var(--secondary)";
+    function addChatMessage(sender, text, isHtml = false) {
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `chat-message ${sender === 'bot' ? 'bot' : 'user'}`;
+        
+        const bubble = document.createElement("div");
+        bubble.className = "chat-bubble";
+        
+        if (isHtml) {
+            bubble.innerHTML = text;
         } else {
-            fileLabel.textContent = "Drag & drop or click to browse";
-            fileLabel.style.color = "inherit";
+            bubble.textContent = text;
         }
-    });
+        
+        msgDiv.appendChild(bubble);
+        chatHistory.appendChild(msgDiv);
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
 
-    // 2. Submit Task Form
-    taskForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
+    function showInitialOptions() {
+        const optionsHtml = `
+            How can I help you?
+            <div class="chat-options">
+                <button class="chat-option-btn" data-agent="Land Agent">1. Land Agent</button>
+                <button class="chat-option-btn" data-agent="Electricity Bill Agent">2. Electricity Bill Agent</button>
+                <button class="chat-option-btn" data-agent="Share Market Agent">3. Share Market Agent</button>
+                <button class="chat-option-btn" data-agent="Kolkata Municipal Corporation">4. Kolkata Municipal Corporation</button>
+            </div>
+        `;
+        addChatMessage('bot', optionsHtml, true);
+        
+        // Add listeners to new buttons
+        const buttons = chatHistory.querySelectorAll(".chat-option-btn");
+        buttons.forEach(btn => {
+            btn.addEventListener("click", () => handleAgentSelection(btn.getAttribute("data-agent")));
+        });
+    }
+
+    function handleAgentSelection(agentName) {
+        selectedAgent = agentName;
+        addChatMessage('user', agentName);
+        
+        // Remove options from previous message if desired, or just continue
+        setTimeout(() => {
+            const uploadHtml = `
+                Please upload the relevant document for the ${agentName}.
+                <div class="chat-file-upload">
+                    <svg style="width:24px;height:24px;fill:var(--secondary);margin-bottom:8px;" viewBox="0 0 24 24">
+                        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
+                    </svg>
+                    <p id="chatFileLabel" style="font-size:13px;font-weight:500;color:var(--text-main);">Click or drag file here to upload</p>
+                    <input type="file" id="chatDeedFile" name="deed_file" accept=".pdf,.png,.jpg,.jpeg">
+                </div>
+            `;
+            addChatMessage('bot', uploadHtml, true);
+            
+            const fileInput = document.getElementById("chatDeedFile");
+            const fileLabel = document.getElementById("chatFileLabel");
+            
+            fileInput.addEventListener("change", (e) => {
+                if (e.target.files.length > 0) {
+                    const file = e.target.files[0];
+                    fileLabel.textContent = `Selected: ${file.name}`;
+                    submitTask(file);
+                }
+            });
+        }, 500);
+    }
+
+    async function submitTask(file) {
+        addChatMessage('user', `Uploaded: ${file.name}`);
+        addChatMessage('bot', `Starting ${selectedAgent} task...`);
+        
+        // Show Live Agent Console
+        document.getElementById("liveAgentConsole").style.display = "block";
         
         // Reset console state
         logTerminal.innerHTML = "";
         loggedTimestamps.clear();
-        addTerminalLine("Aetheris", "Initializing request payload...", "info");
+        addTerminalLine("Aetheris", `Initializing ${selectedAgent} request payload...`, "info");
         
-        const formData = new FormData(taskForm);
+        const formData = new FormData();
+        formData.append("deed_file", file);
+        formData.append("objective", `Agent Task: ${selectedAgent}`);
         
-        // Append a user-friendly objective based on selected state
-        const state = formData.get("state") || "Auto-detect";
-        const objective = `Deed Audit: Run autonomous ownership verification audit for uploaded deed (State: ${state}).`;
-        formData.append("objective", objective);
-
         try {
             const response = await fetch("/api/tasks", {
                 method: "POST",
@@ -73,11 +129,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 fetchTaskState(currentTaskId);
             } else {
                 addTerminalLine("SystemError", `Failed to initiate task: ${data.error}`, "error");
+                addChatMessage('bot', `Failed to start task: ${data.error}`);
             }
         } catch (error) {
             addTerminalLine("SystemError", `API connection failed: ${error.message}`, "error");
+            addChatMessage('bot', `API connection failed: ${error.message}`);
         }
-    });
+    }
+
+    // Initialize chatbot
+    showInitialOptions();
 
     // Initialize Socket.IO connection
     const socket = io();
