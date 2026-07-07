@@ -1,18 +1,18 @@
 document.addEventListener("DOMContentLoaded", () => {
     const chatHistory = document.getElementById("chatHistory");
-    
+
     const consoleTaskId = document.getElementById("consoleTaskId");
     const consoleStep = document.getElementById("consoleStep");
     const statusBadge = document.getElementById("statusBadge");
     const logTerminal = document.getElementById("logTerminal");
-    
+
     const liveViewImg = document.getElementById("liveViewImg");
     const livePlaceholder = document.getElementById("livePlaceholder");
-    
+
     const captchaModal = document.getElementById("captchaModal");
     const captchaImageSrc = document.getElementById("captchaImageSrc");
     const btnSolveCaptcha = document.getElementById("btnSolveCaptcha");
-    
+
     const resultsSection = document.getElementById("resultsSection");
     const gisIframe = document.getElementById("gisIframe");
     const downloadHtml = document.getElementById("downloadHtml");
@@ -26,16 +26,16 @@ document.addEventListener("DOMContentLoaded", () => {
     function addChatMessage(sender, text, isHtml = false) {
         const msgDiv = document.createElement("div");
         msgDiv.className = `chat-message ${sender === 'bot' ? 'bot' : 'user'}`;
-        
+
         const bubble = document.createElement("div");
         bubble.className = "chat-bubble";
-        
+
         if (isHtml) {
             bubble.innerHTML = text;
         } else {
             bubble.textContent = text;
         }
-        
+
         msgDiv.appendChild(bubble);
         chatHistory.appendChild(msgDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -45,14 +45,14 @@ document.addEventListener("DOMContentLoaded", () => {
         const optionsHtml = `
             How can I help you?
             <div class="chat-options">
-                <button class="chat-option-btn" data-agent="Land Agent">1. Land Agent</button>
-                <button class="chat-option-btn" data-agent="Electricity Bill Agent">2. Electricity Bill Agent</button>
-                <button class="chat-option-btn" data-agent="Share Market Agent">3. Share Market Agent</button>
-                <button class="chat-option-btn" data-agent="Kolkata Municipal Corporation">4. Kolkata Municipal Corporation</button>
+                <button class="chat-option-btn" data-agent="Land Agent">1. Land Related</button>
+                <button class="chat-option-btn" data-agent="Electricity Bill Agent">2. Electricity Bill Related</button>
+                <button class="chat-option-btn" data-agent="Share Market Agent">3. Share Market Related</button>
+                <button class="chat-option-btn" data-agent="Kolkata Municipal Corporation">4. KMC Related</button>
             </div>
         `;
         addChatMessage('bot', optionsHtml, true);
-        
+
         // Add listeners to new buttons
         const buttons = chatHistory.querySelectorAll(".chat-option-btn");
         buttons.forEach(btn => {
@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function handleAgentSelection(agentName) {
         selectedAgent = agentName;
         addChatMessage('user', agentName);
-        
+
         setTimeout(() => {
             // Share Market Agent: ask for symbol, no file upload needed
             if (agentName === "Share Market Agent") {
@@ -144,10 +144,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 </div>
             `;
             addChatMessage('bot', uploadHtml, true);
-            
+
             const fileInput = document.getElementById("chatDeedFile");
             const fileLabel = document.getElementById("chatFileLabel");
-            
+
             fileInput.addEventListener("change", (e) => {
                 if (e.target.files.length > 0) {
                     const file = e.target.files[0];
@@ -223,37 +223,37 @@ document.addEventListener("DOMContentLoaded", () => {
     async function submitTask(file) {
         addChatMessage('user', `Uploaded: ${file.name}`);
         addChatMessage('bot', `Starting ${selectedAgent} task...`);
-        
+
         // Show Live Agent Console
         document.getElementById("liveAgentConsole").style.display = "block";
-        
+
         // Reset console state
         logTerminal.innerHTML = "";
         loggedTimestamps.clear();
         addTerminalLine("Aetheris", `Initializing ${selectedAgent} request payload...`, "info");
-        
+
         const formData = new FormData();
         formData.append("deed_file", file);
         formData.append("objective", `Agent Task: ${selectedAgent}`);
-        
+
         try {
             const response = await fetch("/api/tasks", {
                 method: "POST",
                 body: formData
             });
             const data = await response.json();
-            
+
             if (data.success) {
                 currentTaskId = data.task_id;
                 consoleTaskId.textContent = `Task ID: #${currentTaskId}`;
                 addTerminalLine("Supervisor", `Task created successfully. ID: #${currentTaskId}`, "success");
-                
+
                 // Hide results section if visible from previous run
                 resultsSection.style.display = "none";
-                
+
                 // Refresh task list sidebar
                 await loadTaskHistory();
-                
+
                 // Load initial task state once
                 fetchTaskState(currentTaskId);
             } else {
@@ -279,12 +279,12 @@ document.addEventListener("DOMContentLoaded", () => {
             const logSignature = `${log.agent_name}_${log.action}_${resultSnippet}`;
             if (!loggedTimestamps.has(logSignature)) {
                 loggedTimestamps.add(logSignature);
-                
+
                 let lineType = "info";
                 if (log.status === "FAILURE") lineType = "error";
                 else if (log.status === "WARNING") lineType = "warning";
                 else if (log.status === "SUCCESS") lineType = "success";
-                
+
                 const msg = log.result || log.error_message || `Executing: ${log.action}`;
                 addTerminalLine(log.agent_name, msg, lineType);
             }
@@ -303,7 +303,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (update.task_id) {
             // Reload history list status changes in background
             await loadTaskHistory();
-            
+
             if (currentTaskId && update.task_id === currentTaskId) {
                 fetchTaskState(currentTaskId);
             }
@@ -315,15 +315,15 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const response = await fetch(`/api/tasks/${taskId}`);
             const data = await response.json();
-            
+
             if (data.success) {
                 const task = data.task;
                 updateUIStatus(task);
                 processLogs(task.logs);
-                
+
                 if (task.status === "COMPLETED") {
                     addTerminalLine("Supervisor", "Workflow finalized successfully! Output files ready.", "success");
-                    
+
                     // Log validation results to terminal console
                     if (task.verification) {
                         if (!task.verification.is_valid) {
@@ -337,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             addTerminalLine("ValidationAgent", "SUCCESS: All records matched successfully with the government database!", "success");
                         }
                     }
-                    
+
                     displayResults(task);
                 } else if (task.status === "FAILED") {
                     addTerminalLine("Supervisor", `Workflow terminated with error: ${task.error_message}`, "error");
@@ -351,10 +351,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // 4. Update Header and Badges
     function updateUIStatus(task) {
         consoleStep.textContent = `Current Step: ${task.current_step || 'Processing'}`;
-        
+
         statusBadge.textContent = task.status;
         statusBadge.className = "status-badge"; // Reset classes
-        
+
         if (task.status === "PENDING") statusBadge.classList.add("badge-pending");
         else if (task.status === "RUNNING") statusBadge.classList.add("badge-running");
         else if (task.status === "COMPLETED") statusBadge.classList.add("badge-completed");
@@ -366,14 +366,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // Update workflow pipeline progress bar and labels
         updatePipelineTracker(task);
-        
+
         // Update mock browser address text URL
         updateBrowserUrl(task);
 
         // If task has extracted document, render the deed preview
         const deedPreviewCard = document.getElementById("deedPreviewCard");
         const deedPreviewContent = document.getElementById("deedPreviewContent");
-        
+
         if (task.extracted_document && deedPreviewCard && deedPreviewContent) {
             deedPreviewCard.style.display = "block";
             const doc = task.extracted_document;
@@ -397,33 +397,33 @@ document.addEventListener("DOMContentLoaded", () => {
     // 5. Render live logs and browser images
     function processLogs(logs) {
         if (!logs || logs.length === 0) return;
-        
+
         let latestScreenshot = null;
-        
+
         logs.forEach(log => {
             // Use stable key matching the socket.io handler (no timestamp)
             const resultSnippet = (log.result || log.error_message || log.action || "").slice(0, 60);
             const logSignature = `${log.agent_name}_${log.action}_${resultSnippet}`;
-            
+
             if (!loggedTimestamps.has(logSignature)) {
                 loggedTimestamps.add(logSignature);
-                
+
                 const timeParts = log.timestamp.split(" ");
                 const timeStr = timeParts.length > 1 ? timeParts[1] : timeParts[0];
                 let lineType = "info";
                 if (log.status === "FAILURE") lineType = "error";
                 else if (log.status === "WARNING") lineType = "warning";
                 else if (log.status === "SUCCESS") lineType = "success";
-                
+
                 const msg = log.result || log.error_message || `Executing: ${log.action}`;
                 addTerminalLine(log.agent_name, msg, lineType, timeStr);
             }
-            
+
             if (log.screenshot_url) {
                 latestScreenshot = log.screenshot_url;
             }
         });
-        
+
         // Update browser live view feed
         if (latestScreenshot) {
             liveViewImg.src = latestScreenshot;
@@ -438,21 +438,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const now = new Date();
             timeStr = now.toTimeString().split(' ')[0];
         }
-        
+
         const line = document.createElement("div");
         line.className = "terminal-line";
-        
+
         let colorClass = "";
         if (type === "error") colorClass = "terminal-error";
         else if (type === "warning") colorClass = "terminal-warning";
         else if (type === "success") colorClass = "terminal-success";
-        
+
         line.innerHTML = `
             <span class="terminal-time">[${timeStr}]</span>
             <span class="terminal-agent">[${agent}]</span>
             <span class="${colorClass}">${text}</span>
         `;
-        
+
         logTerminal.appendChild(line);
         logTerminal.scrollTop = logTerminal.scrollHeight;
     }
@@ -462,7 +462,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Find latest screenshot in logs to display in modal
         let captchaImgUrl = "/static/captcha_placeholder.png"; // Fallback placeholder
         let isLoginPause = false;
-        
+
         for (let i = logs.length - 1; i >= 0; i--) {
             if (logs[i].screenshot_url) {
                 captchaImgUrl = logs[i].screenshot_url;
@@ -471,10 +471,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 isLoginPause = true;
             }
         }
-        
+
         const titleEl = document.getElementById("captchaModalTitle");
         const descEl = document.getElementById("captchaModalDesc");
-        
+
         if (isLoginPause) {
             if (titleEl) titleEl.textContent = "Action Required: Manual Login";
             if (descEl) descEl.textContent = "Please use the physical browser window to log in manually (enter Username, Password, and OTP). Once you are successfully logged in and on the landing search page, click the button below to resume the AI agent.";
@@ -482,17 +482,17 @@ document.addEventListener("DOMContentLoaded", () => {
             if (titleEl) titleEl.textContent = "CAPTCHA Challenge Detected";
             if (descEl) descEl.textContent = "The autonomous browser agent is currently paused. Please solve the captcha in the image below, then click continue.";
         }
-        
+
         captchaImageSrc.src = captchaImgUrl;
         captchaModal.classList.add("active");
     }
 
     btnSolveCaptcha.addEventListener("click", async () => {
         if (!currentTaskId) return;
-        
+
         addTerminalLine("User", "CAPTCHA solved confirmation sent to system.", "info");
         captchaModal.classList.remove("active");
-        
+
         try {
             const response = await fetch(`/api/tasks/${currentTaskId}/solve-captcha`, {
                 method: "POST"
@@ -509,9 +509,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // 7. Results Dashboard
     function displayResults(task) {
         resultsSection.style.display = "block";
-        
+
         // GIS map removed per user request
-        
+
         // Configure report links
         const viewHtml = document.getElementById('viewHtml');
         if (task.metadata.html_report) {
@@ -538,7 +538,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 downloadHtml.style.opacity = "0.5";
             }
         }
-        
+
         if (task.metadata.excel_report) {
             downloadExcel.href = `/api/storage/reports/${task.metadata.excel_report.split(/[/\\]/).pop()}`;
             downloadExcel.style.pointerEvents = "auto";
@@ -548,7 +548,7 @@ document.addEventListener("DOMContentLoaded", () => {
             downloadExcel.style.pointerEvents = "none";
             downloadExcel.style.opacity = "0.5";
         }
-        
+
         if (task.gis_data) {
             downloadGeoJson.href = `/api/storage/reports/plot_${task.id}_geojson.json`;
             downloadGeoJson.style.pointerEvents = "auto";
@@ -558,17 +558,17 @@ document.addEventListener("DOMContentLoaded", () => {
             downloadGeoJson.style.pointerEvents = "none";
             downloadGeoJson.style.opacity = "0.5";
         }
-        
+
         // Handle AI Insights section
         const insightsSectionWrapper = document.getElementById("insightsSectionWrapper");
         const aiSectionTitle = document.getElementById("aiSectionTitle");
         const aiConsumptionTitle = document.getElementById("aiConsumptionTitle");
         const billingTrendTitle = document.getElementById("billingTrendTitle");
         const billGraphContainer = document.getElementById("billGraphContainer");
-        
+
         if (task.metadata && task.metadata.ai_analysis && !task.metadata.ai_analysis.insufficient_data) {
             if (insightsSectionWrapper) insightsSectionWrapper.style.display = "block";
-            
+
             // Adjust titles for Share Market
             const isShareMarket = task.document && task.document.utility_type === "SHARE_MARKET";
             if (isShareMarket) {
@@ -580,22 +580,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (aiConsumptionTitle) aiConsumptionTitle.innerText = "AI Consumption Analysis";
                 if (billingTrendTitle) billingTrendTitle.innerText = "Billing Trend Graph";
             }
-            
+
             const aiData = task.metadata.ai_analysis;
-            
+
             // Set Summary Text
             const aiSummaryText = document.getElementById("aiSummaryText");
-            if(aiSummaryText) {
+            if (aiSummaryText) {
                 aiSummaryText.innerHTML = `
                     <p style="margin-top: 0;"><b>Summary:</b> ${aiData.summary || "No summary available."}</p>
                     <p style="margin-bottom: 0;"><b>Recommendation for Next Month:</b> ${aiData.recommendation || "No recommendations available."}</p>
                 `;
             }
-            
+
             // Render Graph
             const labels = aiData.chart_labels ? [...aiData.chart_labels].reverse() : [];
             const data = aiData.chart_data ? [...aiData.chart_data].reverse() : [];
-            
+
             if (labels.length === 0 || data.length === 0) {
                 if (billGraphContainer) billGraphContainer.style.display = "none";
                 if (billingTrendTitle) billingTrendTitle.style.display = "none";
@@ -603,7 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (billGraphContainer) billGraphContainer.style.display = "block";
                 if (billingTrendTitle) billingTrendTitle.style.display = "block";
             }
-            
+
             const ctx = document.getElementById('billGraph').getContext('2d');
             if (window.billChart) {
                 window.billChart.destroy();
@@ -639,7 +639,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 }
             });
-            
+
         } else {
             if (insightsSectionWrapper) insightsSectionWrapper.style.display = "none";
         }
@@ -657,27 +657,27 @@ document.addEventListener("DOMContentLoaded", () => {
                         historyList.innerHTML = `<p style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">No audits found</p>`;
                         return;
                     }
-                    
+
                     historyList.innerHTML = "";
                     // Sort descending by ID
                     const sortedTasks = data.tasks.sort((a, b) => b.id - a.id);
-                    
+
                     sortedTasks.forEach(task => {
                         const item = document.createElement("div");
                         item.className = "history-item";
                         if (currentTaskId === task.id) {
                             item.classList.add("active");
                         }
-                        
+
                         let badgeClass = "badge-pending";
                         if (task.status === "RUNNING") badgeClass = "badge-running";
                         else if (task.status === "COMPLETED") badgeClass = "badge-completed";
                         else if (task.status === "FAILED") badgeClass = "badge-failed";
                         else if (task.status === "PAUSED_CAPTCHA") badgeClass = "badge-captcha";
-                        
+
                         const stateText = task.metadata && task.metadata.state ? task.metadata.state : "WB";
                         const desc = task.objective ? task.objective.replace("Deed Audit: Run autonomous ownership verification audit for uploaded deed in state: ", "") : "Autonomous Audit";
-                        
+
                         item.innerHTML = `
                             <div class="history-details">
                                 <div class="history-id">Audit Run #${task.id} <span style="font-size: 10px; color: var(--primary); margin-left: 5px; font-weight:700;">[${stateText}]</span></div>
@@ -685,7 +685,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             </div>
                             <span class="status-badge ${badgeClass}" style="font-size: 9px; padding: 3px 8px; border-radius:4px;">${task.status}</span>
                         `;
-                        
+
                         item.addEventListener("click", () => {
                             selectTask(task.id);
                         });
@@ -701,7 +701,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Select and load a task from history
     function selectTask(taskId) {
         currentTaskId = taskId;
-        
+
         // Highlight active list item
         const items = document.querySelectorAll(".history-item");
         items.forEach(item => {
@@ -712,17 +712,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 item.classList.remove("active");
             }
         });
-        
+
         consoleTaskId.textContent = `Task ID: #${taskId}`;
         logTerminal.innerHTML = "";
         loggedTimestamps.clear();
-        
+
         // Reset browser frame and progress bar
         liveViewImg.style.display = "none";
         livePlaceholder.style.display = "block";
         document.getElementById("browserUrlText").textContent = "about:blank";
         resultsSection.style.display = "none";
-        
+
         // Fetch specific task state
         fetchTaskState(taskId);
     }
@@ -731,25 +731,25 @@ document.addEventListener("DOMContentLoaded", () => {
     function updatePipelineTracker(task) {
         const progressBar = document.getElementById("pipelineProgressBar");
         const progressText = document.getElementById("pipelineProgressText");
-        
+
         const lblStepDoc = document.getElementById("lblStepDoc");
         const lblStepVal = document.getElementById("lblStepVal");
         const lblStepSearch = document.getElementById("lblStepSearch");
         const lblStepVerify = document.getElementById("lblStepVerify");
         const lblStepReport = document.getElementById("lblStepReport");
-        
+
         const labels = [lblStepDoc, lblStepVal, lblStepSearch, lblStepVerify, lblStepReport];
-        
+
         labels.forEach(lbl => {
             if (lbl) {
                 lbl.classList.remove("active");
                 lbl.classList.remove("completed");
             }
         });
-        
+
         let percent = 0;
         let activeIdx = -1;
-        
+
         if (task.status === "COMPLETED") {
             percent = 100;
             activeIdx = 5;
@@ -758,7 +758,7 @@ document.addEventListener("DOMContentLoaded", () => {
             activeIdx = 5;
         } else {
             const step = (task.current_step || "").toLowerCase();
-            
+
             if (step.includes("extract")) {
                 percent = 15;
                 activeIdx = 0;
@@ -779,10 +779,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 activeIdx = 0;
             }
         }
-        
+
         if (progressBar) progressBar.style.width = `${percent}%`;
         if (progressText) progressText.textContent = `${percent}% Completed`;
-        
+
         labels.forEach((lbl, idx) => {
             if (lbl) {
                 if (idx < activeIdx) {
@@ -798,10 +798,10 @@ document.addEventListener("DOMContentLoaded", () => {
     function updateBrowserUrl(task) {
         const browserUrlText = document.getElementById("browserUrlText");
         if (!browserUrlText) return;
-        
+
         let url = "about:blank";
         const state = (task.metadata && task.metadata.state ? task.metadata.state : "").toUpperCase();
-        
+
         if (task.logs && task.logs.length > 0) {
             for (let i = 0; i < task.logs.length; i++) {
                 const log = task.logs[i];
@@ -811,7 +811,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         }
-        
+
         if (url === "about:blank") {
             if (state === "WB") {
                 url = "https://portal.wbsedcl.in/webdynpro/resources/wbsedcl/viewbillwl/WBViewBillWL";
@@ -821,20 +821,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 url = "https://biharbhumi.bihar.gov.in/";
             }
         }
-        
+
         browserUrlText.textContent = url;
     }
 
     // Initialize Dashboard
     async function initDashboard() {
         await loadTaskHistory();
-        
+
         // Auto-select the latest task if available
         const firstItem = document.querySelector(".history-item");
         if (firstItem) {
             firstItem.click();
         }
     }
-    
+
     initDashboard();
 });
