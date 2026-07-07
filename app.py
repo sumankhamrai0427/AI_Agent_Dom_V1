@@ -8,7 +8,7 @@ from utils.socket_instance import socketio
 app = Flask(__name__, static_folder="static", template_folder="templates")
 controller = TaskController()
 
-# Initialize SocketIO with Flask app
+# Initialize SocketIO with Flask app/////
 socketio.init_app(app)
 
 @socketio.on('connect')
