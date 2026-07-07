@@ -41,9 +41,9 @@ def get_task_status(task_id):
 def resolve_captcha(task_id):
     return controller.resolve_captcha(task_id)
 
-# @app.route("/api/tasks/<int:task_id>/document-data", methods=["GET"])
-# def get_task_document_data(task_id):
-#     return controller.get_task_document_data(task_id)
+@app.route("/api/tasks/<int:task_id>/document-data", methods=["GET"])
+def get_task_document_data(task_id):
+    return controller.get_task_document_data(task_id)
 
 # File server routes
 @app.route("/api/storage/screenshots/<path:filename>")
