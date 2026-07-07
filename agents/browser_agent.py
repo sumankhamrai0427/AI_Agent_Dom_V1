@@ -312,24 +312,12 @@ class BrowserAgent:
                                         let mo = cells[1 + offset].innerText.trim();
                                         let cleanMo = mo.replace(/[^a-zA-Z0-9]/g, '');
                                         
-                                        let actionEl = cells[5 + offset] ? cells[5 + offset].querySelector('a, img, button, input') : null;
-                                        let dl_id = "";
-                                        if (actionEl) {
-                                            dl_id = `pdf_dl_${inv}_${cleanMo}`;
-                                            actionEl.setAttribute("id", dl_id);
-                                        }
-                                        
-                                        // The AI Agent simulates downloading the historical PDF and saving it locally.
-                                        let pdfLink = `/api/storage/historical_bills/${inv}_${mo}.pdf`;
-                                        
                                         history.push({
                                             invoice_number: inv,
                                             bill_month: mo,
                                             bill_due_date: cells[2 + offset].innerText.trim(),
                                             amount_before_due: cells[3 + offset].innerText.trim(),
-                                            amount_after_due: cells[4 + offset].innerText.trim(),
-                                            pdf_link: pdfLink,
-                                            dl_id: dl_id
+                                            amount_after_due: cells[4 + offset].innerText.trim()
                                         });
                                     }
                                 }
@@ -343,18 +331,6 @@ class BrowserAgent:
                         """
                         res_data = await page.evaluate(js_extract)
                         
-                        # Simulate the physical download of the PDFs by copying the uploaded bill for the offline demo
-                        import os
-                        import shutil
-                        hist_dir = "storage/reports/historical_bills"
-                        os.makedirs(hist_dir, exist_ok=True)
-                        uploads_dir = "storage/uploads"
-                        source_pdf = None
-                        if os.path.exists(uploads_dir):
-                            pdfs = [f for f in os.listdir(uploads_dir) if f.endswith(".pdf")]
-                            if pdfs:
-                                source_pdf = os.path.join(uploads_dir, sorted(pdfs, key=lambda x: os.path.getmtime(os.path.join(uploads_dir, x)))[-1])
-                        
                         if res_data:
                             extracted_portal_data = {
                                 "owner_name": search_params.get("owner_name") or "SUSHIL KR BISWAS",
@@ -364,37 +340,6 @@ class BrowserAgent:
                                 "bill_month": res_data.get("bill_month"),
                                 "bill_history": res_data.get("bill_history", [])
                             }
-                            
-                            # Try to physically download the PDFs via popup interception if live on the page
-                            for bill in extracted_portal_data["bill_history"]:
-                                dest = os.path.join(hist_dir, f"{bill['invoice_number']}_{bill['bill_month']}.pdf")
-                                downloaded = False
-                                dl_id = bill.get("dl_id")
-                                if dl_id:
-                                    try:
-                                        # Attempt to intercept popup and download the PDF
-                                        async with page.expect_popup(timeout=3000) as popup_info:
-                                            await page.click(f"#{dl_id}")
-                                        popup = await popup_info.value
-                                        await popup.wait_for_load_state()
-                                        
-                                        # Download the PDF from the popup URL (assuming it's a native PDF viewer)
-                                        response = await page.context.request.get(popup.url)
-                                        pdf_buffer = await response.body()
-                                        with open(dest, "wb") as f:
-                                            f.write(pdf_buffer)
-                                        await popup.close()
-                                        downloaded = True
-                                        logger.info(f"Successfully downloaded live PDF popup for {dl_id}")
-                                    except Exception as e:
-                                        logger.warning(f"Live popup download failed for {dl_id}, falling back to copy. Reason: {e}")
-                                
-                                # Fallback: Simulate "download" by copying the uploaded PDF file
-                                if not downloaded and source_pdf:
-                                    try:
-                                        shutil.copy2(source_pdf, dest)
-                                    except Exception as e:
-                                        logger.error(f"Failed to generate historical PDF {dest}: {e}")
                             
                             logger.info(f"Directly extracted bill details: {extracted_portal_data}")
                     except Exception as e:

@@ -47,15 +47,14 @@ class PDFService:
                 bill_history = data.get("portal", {}).get("bill_history", []) if isinstance(data.get("portal"), dict) else []
                 if bill_history:
                     ws_history = wb.create_sheet(title="Bill History")
-                    ws_history.append(["Invoice Number", "Bill Month", "Due Date", "Amount Before Due", "Amount After Due", "PDF Link"])
+                    ws_history.append(["Invoice Number", "Bill Month", "Due Date", "Amount Before Due", "Amount After Due"])
                     for bill in bill_history:
                         ws_history.append([
                             bill.get("invoice_number", ""),
                             bill.get("bill_month", ""),
                             bill.get("bill_due_date", ""),
                             bill.get("amount_before_due", ""),
-                            bill.get("amount_after_due", ""),
-                            bill.get("pdf_link", "")
+                            bill.get("amount_after_due", "")
                         ])
                 
                 wb.save(output_path)
@@ -92,15 +91,14 @@ class PDFService:
                 if bill_history:
                     writer.writerow([])
                     writer.writerow(["=== BILL HISTORY ==="])
-                    writer.writerow(["Invoice Number", "Bill Month", "Due Date", "Amount Before Due", "Amount After Due", "PDF Link"])
+                    writer.writerow(["Invoice Number", "Bill Month", "Due Date", "Amount Before Due", "Amount After Due"])
                     for bill in bill_history:
                         writer.writerow([
                             bill.get("invoice_number", ""),
                             bill.get("bill_month", ""),
                             bill.get("bill_due_date", ""),
                             bill.get("amount_before_due", ""),
-                            bill.get("amount_after_due", ""),
-                            bill.get("pdf_link", "")
+                            bill.get("amount_after_due", "")
                         ])
 
             logger.info(f"CSV report successfully generated: {csv_path}")
@@ -244,8 +242,6 @@ class PDFService:
         if bill_history:
             bill_rows = ""
             for bill in bill_history:
-                pdf_link = bill.get("pdf_link", "")
-                link_html = f'<a href="{pdf_link}" target="_blank" style="color: #4F46E5; text-decoration: none; font-weight: 600;">View PDF</a>' if pdf_link else 'N/A'
                 bill_rows += f"""
                 <tr>
                     <td>{bill.get('invoice_number', '')}</td>
@@ -253,7 +249,6 @@ class PDFService:
                     <td>{bill.get('bill_due_date', '')}</td>
                     <td>{bill.get('amount_before_due', '')}</td>
                     <td>{bill.get('amount_after_due', '')}</td>
-                    <td>{link_html}</td>
                 </tr>
                 """
             
@@ -268,7 +263,6 @@ class PDFService:
                             <th>Due Date</th>
                             <th>Amt (Before Due)</th>
                             <th>Amt (After Due)</th>
-                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody>
