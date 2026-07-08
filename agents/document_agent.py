@@ -43,6 +43,7 @@ class DocumentAgent:
         Tasks:
         1. Detect the "utility_type" first. 
            - If the document is an electricity bill or contains electricity consumer/installation details (e.g. from WBSEDCL), set "utility_type": "ELECTRICITY".
+           - If the document is a travel itinerary, ticket, or letter mentioning travel, source, destination, set "utility_type": "TRAVEL".
            - Otherwise, set "utility_type": "LAND".
         
         2. CRITICAL LANGUAGE REQUIREMENT:
@@ -57,16 +58,16 @@ class DocumentAgent:
            Apply these spelling corrections robustly so names and fields match standard database values.
            
         4. You MUST extract the following keys exactly:
-           - "utility_type": "LAND" or "ELECTRICITY"
-           - "owner_name": owner's/customer's name in original language/script
-           - "father_name": owner's father's name (for LAND; null for ELECTRICITY if not present)
+           - "utility_type": "LAND", "ELECTRICITY", or "TRAVEL"
+           - "owner_name": owner's/customer's/passenger's name in original language/script
+           - "father_name": owner's father's name (for LAND; null for ELECTRICITY/TRAVEL if not present)
            - "village": village/locality name (for LAND; address/locality for ELECTRICITY if present)
            - "district": district name
-           - "khata": khata number (for LAND; null for ELECTRICITY)
-           - "khasra": khasra or plot number (for LAND; null for ELECTRICITY)
-           - "survey_no": survey number (for LAND; null for ELECTRICITY)
-           - "area": land size/area (for LAND; null for ELECTRICITY)
-           - "reference_number": document registry/reference number / bill number
+           - "khata": khata number (for LAND; null for ELECTRICITY/TRAVEL)
+           - "khasra": khasra or plot number (for LAND; null for ELECTRICITY/TRAVEL)
+           - "survey_no": survey number (for LAND; null for ELECTRICITY/TRAVEL)
+           - "area": land size/area (for LAND; null for ELECTRICITY/TRAVEL)
+           - "reference_number": document registry/reference number / bill number / PNR
            - "consumer_id": 9-digit consumer ID/number (only if utility_type is ELECTRICITY, else null)
            - "installation_no": 9-digit installation number (only if utility_type is ELECTRICITY, else null)
            - "bill_amount": bill amount (only if utility_type is ELECTRICITY, else null)
@@ -74,6 +75,10 @@ class DocumentAgent:
            - "district_code": numerical code of the district if present in text, else null
            - "tehsil_code": numerical code of the tehsil if present in text, else null
            - "village_code": numerical code of the village if present in text, else null
+           - "source": travel source city (only if utility_type is TRAVEL, else null)
+           - "destination": travel destination city (only if utility_type is TRAVEL, else null)
+           - "travel_date": date of travel in DD-MMM-YYYY format (only if utility_type is TRAVEL, else null)
+           - "passenger_name": name of passenger (only if utility_type is TRAVEL, else null)
         
         Return ONLY a valid JSON object matching these keys.
         """
@@ -108,7 +113,35 @@ class DocumentAgent:
                     "bill_month": "June 2026",
                     "district_code": None,
                     "tehsil_code": None,
-                    "village_code": None
+                    "village_code": None,
+                    "source": None,
+                    "destination": None,
+                    "travel_date": None,
+                    "passenger_name": None
+                }
+            elif "travel" in lower_path or "ticket" in lower_path or "redbus" in lower_path:
+                fallback_data = {
+                    "utility_type": "TRAVEL",
+                    "owner_name": "Suman Khamrai",
+                    "father_name": None,
+                    "village": None,
+                    "district": None,
+                    "khata": None,
+                    "khasra": None,
+                    "survey_no": None,
+                    "area": None,
+                    "reference_number": "PNR-RB-98765",
+                    "consumer_id": None,
+                    "installation_no": None,
+                    "bill_amount": None,
+                    "bill_month": None,
+                    "district_code": None,
+                    "tehsil_code": None,
+                    "village_code": None,
+                    "source": "Kolkata",
+                    "destination": "Digha",
+                    "travel_date": "25-Oct-2026",
+                    "passenger_name": "Suman Khamrai"
                 }
             else:
                 fallback_data = {
@@ -128,7 +161,11 @@ class DocumentAgent:
                     "bill_month": None,
                     "district_code": None,
                     "tehsil_code": None,
-                    "village_code": None
+                    "village_code": None,
+                    "source": None,
+                    "destination": None,
+                    "travel_date": None,
+                    "passenger_name": None
                 }
             
             # Try basic regex check if matches exist in text

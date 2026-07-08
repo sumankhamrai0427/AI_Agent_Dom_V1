@@ -156,18 +156,37 @@ class LLMClient:
             return json.dumps(plan) if json_mode else str(plan)
 
         elif "document text content" in prompt_lower or "paddleocr" in prompt_lower or "easyocr" in prompt_lower or "analyze the following document" in prompt_lower:
-            data = {
-                "owner_name": "Ramesh Kumar",
-                "father_name": "Suresh Kumar",
-                "village": "Bara",
-                "district": "Varanasi",
-                "khata": "452",
-                "khasra": "120",
-                "survey_no": "SV-981",
-                "area": "1.25 Hectares",
-                "reference_number": "REF-UP-2026-902",
-                "raw_text": "Extracted text content showing Ramesh Kumar, father Suresh Kumar, village Bara in district Varanasi. Khata 452 and khasra 120."
-            }
+            if "travel" in prompt_lower or "ticket" in prompt_lower or "redbus" in prompt_lower or "itinerary" in prompt_lower:
+                data = {
+                    "utility_type": "TRAVEL",
+                    "owner_name": "Suman Khamrai",
+                    "father_name": None,
+                    "village": None,
+                    "district": None,
+                    "khata": None,
+                    "khasra": None,
+                    "survey_no": None,
+                    "area": None,
+                    "reference_number": "PNR-RB-98765",
+                    "source": "Kolkata",
+                    "destination": "Digha",
+                    "travel_date": "25-Oct-2026",
+                    "passenger_name": "Suman Khamrai",
+                    "raw_text": prompt_lower
+                }
+            else:
+                data = {
+                    "owner_name": "Ramesh Kumar",
+                    "father_name": "Suresh Kumar",
+                    "village": "Bara",
+                    "district": "Varanasi",
+                    "khata": "452",
+                    "khasra": "120",
+                    "survey_no": "SV-981",
+                    "area": "1.25 Hectares",
+                    "reference_number": "REF-UP-2026-902",
+                    "raw_text": "Extracted text content showing Ramesh Kumar, father Suresh Kumar, village Bara in district Varanasi. Khata 452 and khasra 120."
+                }
             return json.dumps(data) if json_mode else str(data)
 
         elif "observe" in prompt_lower or "browser status" in prompt_lower or "interactive elements" in prompt_lower:
@@ -196,6 +215,17 @@ class LLMClient:
             elif "captcha" in prompt_lower:
                 decision["reasoning"] = "CAPTCHA image detected on form. Pausing execution for human solving."
                 decision["next_action"] = {"action": "wait", "selector": "#captcha_image", "value": "CAPTCHA"}
+            
+            # Redbus specific simulation
+            elif "redbus" in prompt_lower or "bus tickets" in prompt_lower:
+                if "type 'kolkata'" in prompt_lower or "source" in prompt_lower and not "'kolkata'" in prompt_lower:
+                    decision["next_action"] = {"action": "type", "selector": "#src", "value": "Kolkata"}
+                elif "type 'digha'" in prompt_lower or "destination" in prompt_lower:
+                    decision["next_action"] = {"action": "type", "selector": "#dest", "value": "Digha"}
+                elif "travel date" in prompt_lower:
+                    decision["next_action"] = {"action": "click", "selector": "#onward_cal"}
+                else:
+                    decision["next_action"] = {"action": "click", "selector": "#search_btn"}
             
             return json.dumps(decision) if json_mode else str(decision)
 

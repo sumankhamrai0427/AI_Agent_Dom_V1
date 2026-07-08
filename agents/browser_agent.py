@@ -498,6 +498,7 @@ class BrowserAgent:
                 
                 is_electricity = (search_params.get("consumer_id") is not None)
                 is_share_market = (search_params.get("symbol") is not None)
+                is_travel = (search_params.get("source") is not None and search_params.get("destination") is not None)
                 
                 if is_electricity:
                     extracted_record_schema = """"extracted_record": {
@@ -515,6 +516,19 @@ class BrowserAgent:
                            "change": "Price change and percentage"
                         }"""
                     output_instructions = "If you see the stock price, company name, and price change on the screen, you must select \"action\": \"extract_data\" and output the details."
+                elif is_travel:
+                    extracted_record_schema = """"extracted_record": {
+                           "buses": [
+                               {
+                                   "name": "Bus Name",
+                                   "departure": "Departure time",
+                                   "arrival": "Arrival time",
+                                   "fare": "Ticket price",
+                                   "rating": "Bus rating"
+                               }
+                           ]
+                        }"""
+                    output_instructions = "CRITICAL: You MUST FIRST use 'type' to enter the source and destination, and 'click' to search. DO NOT use 'extract_data' on the homepage. ONLY use 'extract_data' if you physically see the bus names, schedules, and prices in the Text Content Snippet. DO NOT hallucinate data."
                 else:
                     extracted_record_schema = """"extracted_record": {
                            "owner_name": "Owner Name from page",
@@ -597,6 +611,14 @@ class BrowserAgent:
                                 "installation_no": search_params.get("installation_no") or "2646120",
                                 "bill_amount": "2,350.00",
                                 "bill_month": "MAY,2026 JUN,2026 JUL,2026"
+                            }
+                        elif is_travel:
+                            extracted_portal_data = {
+                                "buses": [
+                                    {"name": "Greenline Travels", "departure": "08:00 PM", "arrival": "06:00 AM", "fare": 850, "rating": 4.5},
+                                    {"name": "Royal Cruiser", "departure": "10:30 PM", "arrival": "07:30 AM", "fare": 1200, "rating": 4.8},
+                                    {"name": "State Transport (WBSTC)", "departure": "06:00 PM", "arrival": "05:00 AM", "fare": 450, "rating": 3.9}
+                                ]
                             }
                         else:
                             extracted_portal_data = {

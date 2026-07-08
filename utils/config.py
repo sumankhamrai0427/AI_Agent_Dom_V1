@@ -63,6 +63,16 @@ PORTAL_MAPPING = {
             "change": "div.P6K39c",
             "name": "div.zzDege"
         }
+    },
+    "REDBUS": {
+        "name": "Redbus",
+        "url": "https://www.redbus.in/",
+        "selectors": {
+            "source_input": "#src",
+            "dest_input": "#dest",
+            "date_input": "#onward_cal",
+            "search_btn": "#search_btn"
+        }
     }
 }
 

@@ -6,6 +6,7 @@ from utils.logger import logger
 SHARE_MARKET_KEYWORDS = ["share market", "stock", "nse", "bse", "equity", "trading"]
 KMC_KEYWORDS = ["kolkata municipal", "kmc", "municipality"]
 ELECTRICITY_KEYWORDS = ["electricity", "electric bill", "wbsedcl", "power bill"]
+TRAVEL_KEYWORDS = ["redbus", "travel", "bus", "itinerary", "journey", "ticket"]
 LAND_KEYWORDS = ["land", "deed", "khata", "khasra", "bhumi", "ownership"]
 
 
@@ -18,6 +19,8 @@ def detect_agent_type(objective: str) -> str:
         return "KMC"
     if any(kw in obj_lower for kw in ELECTRICITY_KEYWORDS):
         return "ELECTRICITY"
+    if any(kw in obj_lower for kw in TRAVEL_KEYWORDS):
+        return "TRAVEL"
     return "LAND"
 
 
@@ -45,6 +48,16 @@ class PlannerAgent:
                 {"id": 2, "task": "Extract Property Records", "status": "PENDING"},
                 {"id": 3, "task": "Verify Findings", "status": "PENDING"},
                 {"id": 4, "task": "Generate Final Report", "status": "PENDING"},
+            ]
+
+        # --- Redbus Travel Agent: fixed plan ---
+        if agent_type == "TRAVEL":
+            return [
+                {"id": 1, "task": "Extract Document Data", "status": "PENDING"},
+                {"id": 2, "task": "Search Travel Portal", "status": "PENDING"},
+                {"id": 3, "task": "Extract Bus Schedules", "status": "PENDING"},
+                {"id": 4, "task": "Analyze Best Travel Options", "status": "PENDING"},
+                {"id": 5, "task": "Generate Final Report", "status": "PENDING"},
             ]
 
         # --- Land / Electricity: standard LLM-driven plan ---

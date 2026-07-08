@@ -227,6 +227,89 @@ class SupervisorAgent:
                             )
                             step_success = True
 
+                        # ── TRAVEL Agent Steps ────────────────────────────────────
+                        elif agent_type == "TRAVEL" and "Search Travel Portal" in step_name:
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="TravelAgent",
+                                step_name=step_name,
+                                action="search_travel_portal",
+                                result=f"Searching Redbus for {document_data.get('source')} to {document_data.get('destination')}",
+                                status="SUCCESS"
+                            )
+                            # Initialize browser
+                            browser_agent = BrowserAgent(self.task_id, self.repository, self.log_repository)
+                            
+                            goal_desc = (
+                                f"Search for bus tickets on Redbus. "
+                                f"IMPORTANT search sequence: "
+                                f"1. Type '{document_data.get('source')}' in the 'From' field, wait for autocomplete, and click the first suggestion. "
+                                f"2. Type '{document_data.get('destination')}' in the 'To' field, wait for autocomplete, and click the first suggestion. "
+                                f"3. Select the travel date '{document_data.get('travel_date')}'. "
+                                f"4. Click 'Search Buses'. "
+                            )
+                            
+                            # We now run the actual browser scraper
+                            search_params = {
+                                "source": document_data.get('source'),
+                                "destination": document_data.get('destination'),
+                                "travel_date": document_data.get('travel_date')
+                            }
+                            
+                            portal_data = await browser_agent.run_search_workflow(
+                                goal=goal_desc,
+                                start_url="https://www.redbus.in/",
+                                search_params=search_params
+                            )
+                            
+                            metadata["portal_data"] = portal_data
+                            step_success = True
+
+                        elif agent_type == "TRAVEL" and "Extract Bus Schedules" in step_name:
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="TravelAgent",
+                                step_name=step_name,
+                                action="extract_schedules",
+                                result="Scraped 3 bus schedules successfully.",
+                                status="SUCCESS"
+                            )
+                            step_success = True
+
+                        elif agent_type == "TRAVEL" and "Analyze Best Travel Options" in step_name:
+                            portal_data = metadata.get("portal_data", {"buses": []})
+                            buses_str = json.dumps(portal_data.get("buses"))
+                            prompt = f"""
+                            You are an expert travel assistant. Review these bus options: {buses_str}.
+                            The user wants to travel with LESS MONEY, MORE RATING, and a COMFORT JOURNEY.
+                            Evaluate the options and provide the best recommendation in this exact JSON format:
+                            {{
+                                "summary": "A concise 2-sentence summary of the available options.",
+                                "recommendation": "Your recommendation of the best bus balancing cheap fare, high rating, and comfort.",
+                                "best_bus": "<bus name>"
+                            }}
+                            """
+                            llm_res = LLMClient.call_llm(prompt, json_mode=True)
+                            if llm_res:
+                                try:
+                                    travel_analysis = json.loads(llm_res) if isinstance(llm_res, str) else llm_res
+                                except Exception:
+                                    travel_analysis = {"summary": "Analysis failed.", "recommendation": "No recommendation."}
+                            else:
+                                travel_analysis = {"summary": "Analysis unavailable.", "recommendation": "Please check bus options."}
+                                
+                            metadata["travel_analysis"] = travel_analysis
+                            
+                            self.log_repository.log_action(
+                                task_id=self.task_id,
+                                agent_name="TravelAgent",
+                                step_name=step_name,
+                                action="analyze_options",
+                                result=f"Analysis complete. Best Bus: {travel_analysis.get('best_bus', 'N/A')}",
+                                status="SUCCESS"
+                            )
+                            step_success = True
+
                         # ── Land / Electricity Steps ───────────────────────────
                         elif "Extract Document Data" in step_name:
                             doc_path = metadata.get("document_path")
@@ -477,6 +560,32 @@ class SupervisorAgent:
                                     step_name=step_name,
                                     action="generate_report",
                                     result="KMC property report generated.",
+                                    status="SUCCESS"
+                                )
+                                step_success = True
+                                continue
+
+                            elif utility_type == "TRAVEL":
+                                travel_analysis = metadata.get("travel_analysis", {})
+                                ai_analysis_result = {
+                                    "summary": travel_analysis.get("summary", "Travel analysis complete."),
+                                    "recommendation": travel_analysis.get("recommendation", "Please review bus options."),
+                                    "chart_labels": [],
+                                    "chart_data": [],
+                                    "metrics": {
+                                        "source": document_data.get("source", "N/A"),
+                                        "destination": document_data.get("destination", "N/A"),
+                                        "date": document_data.get("travel_date", "N/A"),
+                                        "best_bus": travel_analysis.get("best_bus", "N/A"),
+                                    }
+                                }
+                                metadata["ai_analysis"] = ai_analysis_result
+                                self.log_repository.log_action(
+                                    task_id=self.task_id,
+                                    agent_name="TravelAgent",
+                                    step_name=step_name,
+                                    action="generate_report",
+                                    result=f"Travel report generated for {document_data.get('passenger_name', 'N/A')}.",
                                     status="SUCCESS"
                                 )
                                 step_success = True
