@@ -1,6 +1,7 @@
 import os
 import asyncio
 from playwright.async_api import async_playwright
+# pyrefly: ignore [missing-import]
 from playwright_stealth import Stealth
 from utils.logger import logger
 from utils.config import SCREENSHOT_DIR
@@ -33,8 +34,7 @@ class BrowserManager:
         self.context = await self.browser.new_context(
             viewport={"width": 1280, "height": 800},
             accept_downloads=True,
-            ignore_https_errors=True,
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+            ignore_https_errors=True
         )
         
         self.page = await self.context.new_page()
