@@ -1,9 +1,10 @@
 import os
-from flask import Flask
+from flask import Flask, request, jsonify
 from models.models import init_db
 from controllers.task_controller import TaskController
 from utils.logger import logger
 from utils.socket_instance import socketio
+from utils import stock_agent
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 controller = TaskController()
@@ -45,10 +46,30 @@ def resolve_captcha(task_id):
 def get_task_document_data(task_id):
     return controller.get_task_document_data(task_id)
 
-# File server routes
-@app.route("/api/storage/screenshots/<path:filename>")
-def serve_screenshot(filename):
-    return controller.serve_screenshot(filename)
+@app.route("/api/stock-history", methods=["GET"])
+def stock_history():
+    company = request.args.get("company")
+    if not company:
+        return jsonify({"error": "company query parameter required"}), 400
+    symbol = stock_agent._resolve_symbol(company)
+    data = stock_agent.get_one_year_history(symbol)
+    return jsonify(data)
+
+# Duplicate endpoint removed
+# Duplicate endpoint removed - eliminated second definition
+    company = request.args.get("company")
+    if not company:
+        return jsonify({"error": "company query parameter required"}), 400
+    symbol = stock_agent._resolve_symbol(company)
+    data = stock_agent.get_one_year_history(symbol)
+    return jsonify(data)
+def stock_analysis():
+    company = request.args.get("company")
+    if not company:
+        return jsonify({"error": "company query parameter required"}), 400
+    data = stock_agent.analyze_company(company)
+    return jsonify(data)
+
 
 @app.route("/api/storage/reports/<path:filename>")
 def serve_report(filename):
@@ -65,6 +86,11 @@ def serve_upload(filename):
 @app.route("/api/storage/historical_bills/<path:filename>")
 def serve_historical_bill(filename):
     return controller.serve_historical_bill(filename)
+
+# Serve screenshot files for live view updates
+@app.route("/api/storage/screenshots/<path:filename>")
+def serve_screenshot(filename):
+    return controller.serve_screenshot(filename)
 
 # Create local storage folders on start
 os.makedirs("storage/screenshots", exist_ok=True)

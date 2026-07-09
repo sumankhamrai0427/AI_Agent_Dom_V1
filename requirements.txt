@@ -32,3 +32,5 @@ Werkzeug==3.1.8
 playwright-stealth==2.0.3
 flask-socketio==5.6.1
 simple-websocket==1.1.0
+yfinance==0.2.41
+feedparser==6.0.10
