@@ -165,6 +165,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Submit Share Market task (no file needed)
     async function submitShareMarketTask(symbol) {
+    // Store the selected symbol globally for the history view button
+    window.currentSymbol = symbol;
+    addChatMessage('user', `Analysing: ${symbol}`);
+    addChatMessage('bot', `Starting Share Market Agent for ${symbol}...`);
+    document.getElementById("liveAgentConsole").style.display = "block";
+    logTerminal.innerHTML = "";
+    loggedTimestamps.clear();
+    addTerminalLine("Aetheris", `Initializing Share Market Agent for symbol: ${symbol}`, "info");
+
         addChatMessage('user', `Analysing: ${symbol}`);
         addChatMessage('bot', `Starting Share Market Agent for ${symbol}...`);
         document.getElementById("liveAgentConsole").style.display = "block";
@@ -533,6 +542,42 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 7. Results Dashboard
     function displayResults(task) {
+    // Store the last used stock symbol for quick access to history
+    if (window.currentSymbol) {
+        // Ensure a container exists for the history button
+        const existingBtn = document.getElementById('viewHistoryBtn');
+        if (!existingBtn) {
+            const btn = document.createElement('button');
+            btn.id = 'viewHistoryBtn';
+            btn.textContent = '📈 View 1‑Year History';
+            btn.style = 'margin-top:12px; background:linear-gradient(135deg,#10B981, #059669); color:#FFF; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;';
+            btn.addEventListener('click', async () => {
+                try {
+                    const resp = await fetch(`/api/stock-history?company=${window.currentSymbol}`);
+                    const data = await resp.json();
+                    // Build a simple table
+                    let html = '<h3>1‑Year Historical Prices</h3><table style="width:100%;border-collapse:collapse; margin-top:8px;"><thead><tr><th style="border-bottom:1px solid #555;padding:4px;">Date</th><th style="border-bottom:1px solid #555;padding:4px;">Close</th></tr></thead><tbody>';
+                    data.forEach(item => {
+                        html += `<tr><td style="border-bottom:1px solid #333;padding:4px;">${item.date}</td><td style="border-bottom:1px solid #333;padding:4px;">${item.close}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                    const container = document.getElementById('historyContainer') || (() => {
+                        const div = document.createElement('div');
+                        div.id = 'historyContainer';
+                        div.style = 'margin-top:12px; padding:8px; background:rgba(255,255,255,0.08); border-radius:8px;';
+                        resultsSection.appendChild(div);
+                        return div;
+                    })();
+                    container.innerHTML = html;
+                } catch (e) {
+                    console.error('Failed to load history', e);
+                }
+            });
+            // Insert button after results header or at top of resultsSection
+            resultsSection.insertBefore(btn, resultsSection.firstChild);
+        }
+    }
+    resultsSection.style.display = "block";
         resultsSection.style.display = "block";
 
         // GIS map removed per user request
