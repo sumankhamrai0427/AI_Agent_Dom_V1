@@ -47,22 +47,27 @@ class DocumentAgent:
            - Otherwise, set "utility_type": "LAND".
         
         2. CRITICAL LANGUAGE REQUIREMENT:
-           You MUST extract the fields in their original language and script from the document text. DO NOT translate names, villages, districts, or any text to another language.
+           You MUST extract all text fields (owner_name, father_name, village, district) in the EXACT same language and script (e.g. English/Latin alphabet, Hindi/Devanagari, or Bengali script) as they appear in the raw document text. 
+           - If the document text is in English, you MUST extract the values in English. Do NOT translate or transliterate them to Hindi, Bengali, or any other language.
+           - If the document text is in Hindi, you MUST extract them in Hindi.
+           - If the document text is in Bengali, you MUST extract them in Bengali.
+           DO NOT perform any translation or transliteration during extraction. The extracted values must match the raw document text spelling exactly.
         
         3. IMPORTANT FONT ENCODING & SPELLING CORRECTION (only for Hindi/Devanagari text):
            If the input text is in Hindi/Devanagari, you MUST correct any garbled characters, font encoding distortions, or obvious spelling typos to their standard spelling.
            For example:
            - Correct 'अवमत' to 'अमित'
-           - Correct 'यादि' to 'यादव'
+           - Correct 'याদি' to 'यादв'
            - Correct 'पपता' to 'पिता'
            Apply these spelling corrections robustly so names and fields match standard database values.
            
         4. You MUST extract the following keys exactly:
            - "utility_type": "LAND", "ELECTRICITY", or "TRAVEL"
-           - "owner_name": owner's/customer's/passenger's name in original language/script
-           - "father_name": owner's father's name (for LAND; null for ELECTRICITY/TRAVEL if not present)
-           - "village": village/locality name (for LAND; address/locality for ELECTRICITY if present)
-           - "district": district name
+           - "owner_name": owner's/customer's/passenger's name in original language/script (matching raw text script exactly, do NOT translate). For utility/electricity bills (e.g. WBSEDCL), the customer's name is the prominent person name printed at the top of the bill (e.g. "SUSHIL KR BISWAS"), even if it is not explicitly labeled with "Customer Name:" or "Owner Name:". You MUST extract this name exactly as the "owner_name".
+           - "father_name": owner's father's name in original language/script (for LAND; null for ELECTRICITY/TRAVEL if not present, do NOT translate)
+           - "village": village/locality name in original language/script (matching raw text script exactly, do NOT translate)
+           - "district": district name in original language/script (matching raw text script exactly, do NOT translate)
+           - "state": state name/code in English (e.g. "WB", "UP", "BIHAR")
            - "khata": khata number (for LAND; null for ELECTRICITY/TRAVEL)
            - "khasra": khasra or plot number (for LAND; null for ELECTRICITY/TRAVEL)
            - "survey_no": survey number (for LAND; null for ELECTRICITY/TRAVEL)
@@ -102,6 +107,7 @@ class DocumentAgent:
                     "father_name": None,
                     "village": "Baruipara",
                     "district": "Hooghly",
+                    "state": "West Bengal",
                     "khata": None,
                     "khasra": None,
                     "survey_no": None,
@@ -126,6 +132,7 @@ class DocumentAgent:
                     "father_name": None,
                     "village": None,
                     "district": None,
+                    "state": "West Bengal",
                     "khata": None,
                     "khasra": None,
                     "survey_no": None,
@@ -150,6 +157,7 @@ class DocumentAgent:
                     "father_name": "Suresh Kumar",
                     "village": "Bara",
                     "district": "Varanasi",
+                    "state": "Uttar Pradesh",
                     "khata": "452",
                     "khasra": "120",
                     "survey_no": "SV-981",

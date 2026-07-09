@@ -86,7 +86,11 @@ class ActionExecutor:
                             await self._draw_cursor(page, box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
                     except Exception:
                         pass
-                    await page.click(selector)
+                    try:
+                        await page.locator(selector).first.click(timeout=timeout_ms)
+                    except Exception as click_err:
+                        logger.warning(f"Standard click failed on {selector}: {click_err}. Trying force click.")
+                        await page.locator(selector).first.click(force=True, timeout=timeout_ms)
                 else:
                     raise ValueError("Click action requires either selector or coordinates.")
                 success = True
@@ -118,11 +122,108 @@ class ActionExecutor:
                         await self._draw_cursor(page, box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
                 except Exception:
                     pass
-                # Focus and fill using Playwright fill API
+                
+                # Click the element first (force click if covered) to trigger click event handlers
+                try:
+                    await page.locator(selector).first.click(timeout=3000)
+                except Exception:
+                    try:
+                        await page.locator(selector).first.click(force=True, timeout=3000)
+                    except Exception:
+                        pass
+                
+                # Focus and remove readonly/disabled blocks so browser accepts sequential keystrokes
                 await page.focus(selector)
-                await page.locator(selector).fill(str(value))
+                try:
+                    await page.locator(selector).evaluate("el => { el.removeAttribute('readonly'); el.removeAttribute('disabled'); }")
+                except Exception:
+                    pass
+                
+                # Clear existing text first to prevent appending
+                try:
+                    await page.locator(selector).fill("")
+                except Exception:
+                    pass
+                
+                # Type sequentially (character-by-character) with 150ms human-like delay
+                await page.locator(selector).press_sequentially(str(value), delay=150)
+                
                 # Trigger dynamic framework change/input notifications
-                await page.locator(selector).evaluate("el => el.dispatchEvent(new Event('input', { bubbles: true }))")
+                try:
+                    await page.locator(selector).evaluate("el => { el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }")
+                except Exception:
+                    pass
+                
+                # Special Autocomplete handling for RedBus inputs (Clicking the red icon)
+                if selector in ["#srcinput", "#destinput", "#txtSource", "#txtDestination"]:
+                    logger.info(f"Detected RedBus autocomplete selector: {selector}. Waiting for suggestions list and matching value: {value}.")
+                    await asyncio.sleep(1.0)
+                    
+                    clicked_sug = False
+                    suggestion_selectors = [
+                        "li.C120_suggestions_list",
+                        ".suggestion-item",
+                        ".C120_suggestions_list",
+                        "div#suggestion-0"
+                    ]
+                    
+                    value_lower = str(value).lower()
+                    search_term = value_lower.split(',')[0].strip()
+                    logger.info(f"Searching for suggestion containing keyword: '{search_term}'")
+                    
+                    for sug_sel in suggestion_selectors:
+                        try:
+                            locators = await page.locator(sug_sel).all()
+                            for loc in locators:
+                                text = await loc.inner_text()
+                                if search_term in text.lower():
+                                    logger.info(f"Found matching suggestion: '{text.strip()}' for keyword '{search_term}'. Clicking it.")
+                                    # Click the inner icon (red sign) if available, else click the item itself
+                                    try:
+                                        icon_loc = loc.locator("i").first
+                                        if await icon_loc.is_visible():
+                                            await icon_loc.click(force=True, timeout=2000)
+                                        else:
+                                            await loc.click(force=True, timeout=2000)
+                                    except Exception:
+                                        await loc.click(force=True, timeout=2000)
+                                    clicked_sug = True
+                                    break
+                            if clicked_sug:
+                                break
+                        except Exception:
+                            pass
+                    
+                    # Fallback to clicking the first visible suggestion icon/element if no text match succeeded
+                    if not clicked_sug:
+                        fallback_selectors = [
+                            "i.C120_icon",
+                            "div#suggestion-0 i",
+                            ".suggestion-item i",
+                            "li.C120_suggestions_list i",
+                            "div#suggestion-0",
+                            "li.C120_suggestions_list",
+                            ".suggestion-item",
+                            ".C120_suggestions_list"
+                        ]
+                        for sug_sel in fallback_selectors:
+                            try:
+                                locator = page.locator(sug_sel).first
+                                if await locator.is_visible():
+                                    logger.info(f"Fallback clicking first suggestion: {sug_sel}")
+                                    await locator.click(force=True, timeout=2000)
+                                    clicked_sug = True
+                                    break
+                            except Exception:
+                                pass
+                                
+                    if clicked_sug:
+                        # Wait a short moment to let selection register
+                        await asyncio.sleep(1.0)
+                else:
+                    # Sleep 1.5 seconds to let autocomplete lists/dropdowns query and render in DOM
+                    await asyncio.sleep(1.5)
+                
                 success = True
                 
             elif action_name == "select_dropdown":

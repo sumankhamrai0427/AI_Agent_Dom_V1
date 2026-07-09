@@ -98,7 +98,7 @@ class LLMClient:
             payload["response_format"] = {"type": "json_object"}
             
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=60)
+            response = requests.post(url, headers=headers, json=payload, timeout=5)
             if response.status_code == 200:
                 res_data = response.json()
                 text = res_data['choices'][0]['message']['content']
@@ -112,31 +112,39 @@ class LLMClient:
 
     @classmethod
     def call_llm(cls, prompt, system_instruction=None, json_mode=False):
-        # 1. Try Local Mistral first (if configured/available)
-        if MISTRAL_LOCAL_URL:
-            try:
-                logger.info(f"Calling Local Mistral ({MISTRAL_LOCAL_MODEL})...")
-                return cls._call_local_mistral(prompt, system_instruction, json_mode=json_mode)
-            except Exception as e:
-                logger.warning(f"Local Mistral failed, attempting fallback. Error: {e}")
+        # Determine execution order based on ACTIVE_LLM
+        # Options: "gemini", "mistral_cloud", "mistral_local"
+        llm_type = str(ACTIVE_LLM).strip().lower()
+        
+        methods = []
+        if "gemini" in llm_type:
+            methods = ["gemini", "mistral_cloud", "mistral_local"]
+        elif "cloud" in llm_type:
+            methods = ["mistral_cloud", "gemini", "mistral_local"]
+        else: # "local", "small", "mistral_small", etc.
+            methods = ["mistral_local", "mistral_cloud", "gemini"]
 
-        # 2. Try Mistral Cloud next if API key is configured
-        if MISTRAL_API_KEY:
-            try:
-                logger.info(f"Calling Mistral Cloud ({MISTRAL_MODEL})...")
-                return cls._call_mistral(prompt, system_instruction, response_format_json=json_mode)
-            except Exception as e:
-                logger.warning(f"Mistral Cloud failed, attempting fallback. Error: {e}")
+        for method in methods:
+            if method == "gemini" and GEMINI_API_KEY:
+                try:
+                    logger.info(f"Calling Gemini ({GEMINI_MODEL})...")
+                    return cls._call_gemini(prompt, system_instruction, response_schema=json_mode)
+                except Exception as e:
+                    logger.warning(f"Gemini call failed, attempting fallback. Error: {e}")
+            elif method == "mistral_cloud" and MISTRAL_API_KEY:
+                try:
+                    logger.info(f"Calling Mistral Cloud ({MISTRAL_MODEL})...")
+                    return cls._call_mistral(prompt, system_instruction, response_format_json=json_mode)
+                except Exception as e:
+                    logger.warning(f"Mistral Cloud failed, attempting fallback. Error: {e}")
+            elif method == "mistral_local" and MISTRAL_LOCAL_URL:
+                try:
+                    logger.info(f"Calling Local Mistral ({MISTRAL_LOCAL_MODEL})...")
+                    return cls._call_local_mistral(prompt, system_instruction, json_mode=json_mode)
+                except Exception as e:
+                    logger.warning(f"Local Mistral failed, attempting fallback. Error: {e}")
 
-        # 3. Try Gemini as fallback if API key is configured
-        if GEMINI_API_KEY:
-            try:
-                logger.info(f"Calling Gemini ({GEMINI_MODEL})...")
-                return cls._call_gemini(prompt, system_instruction, response_schema=json_mode)
-            except Exception as e:
-                logger.warning(f"Gemini call failed. Error: {e}")
-
-        # 4. If all failed or no keys configured, fallback to simulation mode
+        # If all failed or no keys configured, fallback to simulation mode
         logger.warning("No API Keys configured or calls failed. Operating in Simulation Mode.")
         return cls._simulate_response(prompt, json_mode)
 
@@ -174,12 +182,33 @@ class LLMClient:
                     "passenger_name": "Suman Khamrai",
                     "raw_text": prompt_lower
                 }
+            elif any(k in prompt_lower for k in ["electricity", "electric", "wbsedcl", "bill", "consumer"]):
+                data = {
+                    "utility_type": "ELECTRICITY",
+                    "owner_name": "SUSHIL KR BISWAS",
+                    "father_name": None,
+                    "village": "Bidhan Pally",
+                    "district": "Hooghly",
+                    "state": "WB",
+                    "khata": None,
+                    "khasra": None,
+                    "survey_no": None,
+                    "area": None,
+                    "reference_number": "REF-ELE-2026-902",
+                    "consumer_id": "512016277",
+                    "installation_no": "2646120",
+                    "bill_amount": "766",
+                    "bill_month": "JUL,2026",
+                    "raw_text": prompt_lower
+                }
             else:
                 data = {
+                    "utility_type": "LAND",
                     "owner_name": "Ramesh Kumar",
                     "father_name": "Suresh Kumar",
                     "village": "Bara",
                     "district": "Varanasi",
+                    "state": "UP",
                     "khata": "452",
                     "khasra": "120",
                     "survey_no": "SV-981",
@@ -204,14 +233,108 @@ class LLMClient:
                 "expected_result": "Page elements state updated"
             }
             
-            if "select district" in prompt_lower or "district_list" in prompt_lower:
-                decision["next_action"] = {"action": "select_dropdown", "selector": "#district_list", "value": "Varanasi"}
-            elif "select tehsil" in prompt_lower or "tehsil_list" in prompt_lower:
-                decision["next_action"] = {"action": "select_dropdown", "selector": "#tehsil_list", "value": "Pindra"}
-            elif "select village" in prompt_lower or "village_list" in prompt_lower:
-                decision["next_action"] = {"action": "select_dropdown", "selector": "#village_list", "value": "Bara"}
-            elif "enter khata" in prompt_lower or "khata_no" in prompt_lower:
-                decision["next_action"] = {"action": "type", "selector": "#khata_no", "value": "452"}
+            import re
+            
+            # Dynamic extraction of search parameters from prompt
+            dist_val = "Varanasi"
+            dist_match = re.search(r'"district":\s*"([^"]+)"', prompt_lower)
+            if dist_match:
+                dist_val = dist_match.group(1).title()
+
+            tehsil_val = "Pindra"
+            tehsil_match = re.search(r'"tehsil":\s*"([^"]+)"', prompt_lower)
+            if tehsil_match:
+                tehsil_val = tehsil_match.group(1).title()
+
+            village_val = "Bara"
+            village_match = re.search(r'"village":\s*"([^"]+)"', prompt_lower)
+            if village_match:
+                village_val = village_match.group(1).title()
+
+            khata_val = "452"
+            khata_match = re.search(r'"khata":\s*"([^"]+)"', prompt_lower)
+            if khata_match:
+                khata_val = khata_match.group(1)
+
+            # Dynamically extract select/dropdown elements from the prompt DOM summary
+            select_ids = []
+            select_pattern = re.compile(r'-\s*\[\d+\]\s*<(mat-select|select)[^>]*>.*?(?:id:\s*`([^`]+)`|selector:\s*`([^`]+)`)')
+            for line in prompt_lower.split('\n'):
+                m = select_pattern.search(line)
+                if m:
+                    val_id = m.group(2) or m.group(3)
+                    if val_id:
+                        select_ids.append(val_id if val_id.startswith('#') or val_id.startswith('.') or '[' in val_id else '#' + val_id)
+
+            # Dynamically extract input elements (plot/khata/search inputs) from the prompt DOM summary
+            input_id = None
+            input_pattern = re.compile(r'-\s*\[\d+\]\s*<input[^>]*>.*?(?:plot|khata).*?(?:id:\s*`([^`]+)`|selector:\s*`([^`]+)`)')
+            for line in prompt_lower.split('\n'):
+                m = input_pattern.search(line)
+                if m:
+                    val_id = m.group(1) or m.group(2)
+                    if val_id:
+                        input_id = val_id if val_id.startswith('#') or val_id.startswith('.') or '[' in val_id else '#' + val_id
+                        break
+            
+            if not input_id:
+                # Fallback to the first text input found
+                first_input_pattern = re.compile(r'-\s*\[\d+\]\s*<input(?:\[text\])?[^>]*>.*?(?:id:\s*`([^`]+)`|selector:\s*`([^`]+)`)')
+                for line in prompt_lower.split('\n'):
+                    m = first_input_pattern.search(line)
+                    if m:
+                        val_id = m.group(1) or m.group(2)
+                        if val_id:
+                            input_id = val_id if val_id.startswith('#') or val_id.startswith('.') or '[' in val_id else '#' + val_id
+                            break
+
+            # Dynamically extract the search button/icon from the prompt DOM summary
+            search_btn_selector = None
+            search_pattern = re.compile(r'-\s*\[\d+\]\s*<[^>]+>.*?search.*?(?:id:\s*`([^`]+)`|selector:\s*`([^`]+)`)')
+            for line in prompt_lower.split('\n'):
+                m = search_pattern.search(line)
+                if m:
+                    val_id = m.group(1) or m.group(2)
+                    if val_id:
+                        search_btn_selector = val_id if val_id.startswith('#') or val_id.startswith('.') or '[' in val_id else '#' + val_id
+                        break
+
+            # Check portal name from prompt to match correct selectors
+            if "bhu naksha up" in prompt_lower or "upbhunaksha" in prompt_lower:
+                district_sel = "#mat-select-0"
+                tehsil_sel = "#mat-select-2"
+                village_sel = "#mat-select-4"
+                khata_sel = "#plotNo"
+            elif "bihar bhumi" in prompt_lower:
+                district_sel = "#district"
+                tehsil_sel = "#anchal"
+                village_sel = "#mauja"
+                khata_sel = "#khata"
+            elif "banglarbhumi" in prompt_lower:
+                district_sel = "#ddldistrict"
+                tehsil_sel = "#ddlblk"
+                village_sel = "#ddlmouza"
+                khata_sel = "#khataNo"
+            else:
+                # Fallback to whatever regex found or default
+                district_sel = select_ids[0] if len(select_ids) > 0 else "#district-select"
+                tehsil_sel = select_ids[1] if len(select_ids) > 1 else "#tehsil-select"
+                village_sel = select_ids[2] if len(select_ids) > 2 else "#village-select"
+                khata_sel = input_id if input_id else "#khata-input"
+
+            if "click on .search-icon" in prompt_lower or (search_btn_selector and search_btn_selector in prompt_lower) and any(act in prompt_lower for act in ["last_typed_type", "type on #plotno", "type on"]):
+                decision["next_action"] = {"action": "extract_data"}
+            elif "select district" in prompt_lower or "district_select" in prompt_lower or "district_list" in prompt_lower:
+                decision["next_action"] = {"action": "select_dropdown", "selector": district_sel, "value": dist_val}
+            elif "select tehsil" in prompt_lower or "tehsil_select" in prompt_lower or "tehsil_list" in prompt_lower:
+                decision["next_action"] = {"action": "select_dropdown", "selector": tehsil_sel, "value": tehsil_val}
+            elif "select village" in prompt_lower or "village_select" in prompt_lower or "village_list" in prompt_lower:
+                decision["next_action"] = {"action": "select_dropdown", "selector": village_sel, "value": village_val}
+            elif "enter khata" in prompt_lower or "khata_input" in prompt_lower or "plotno" in prompt_lower or "khata_no" in prompt_lower:
+                decision["next_action"] = {"action": "type", "selector": khata_sel, "value": khata_val}
+            elif "click search" in prompt_lower or "search_btn" in prompt_lower or "search-icon" in prompt_lower:
+                sel = search_btn_selector if search_btn_selector else ".search-icon"
+                decision["next_action"] = {"action": "click", "selector": sel}
             elif "captcha" in prompt_lower:
                 decision["reasoning"] = "CAPTCHA image detected on form. Pausing execution for human solving."
                 decision["next_action"] = {"action": "wait", "selector": "#captcha_image", "value": "CAPTCHA"}
@@ -219,9 +342,9 @@ class LLMClient:
             # Redbus specific simulation
             elif "redbus" in prompt_lower or "bus tickets" in prompt_lower:
                 if "type 'kolkata'" in prompt_lower or "source" in prompt_lower and not "'kolkata'" in prompt_lower:
-                    decision["next_action"] = {"action": "type", "selector": "#src", "value": "Kolkata"}
+                    decision["next_action"] = {"action": "type", "selector": "#srcinput", "value": "Kolkata"}
                 elif "type 'digha'" in prompt_lower or "destination" in prompt_lower:
-                    decision["next_action"] = {"action": "type", "selector": "#dest", "value": "Digha"}
+                    decision["next_action"] = {"action": "type", "selector": "#destinput", "value": "Digha"}
                 elif "travel date" in prompt_lower:
                     decision["next_action"] = {"action": "click", "selector": "#onward_cal"}
                 else:

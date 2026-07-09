@@ -39,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         msgDiv.appendChild(bubble);
         chatHistory.appendChild(msgDiv);
         chatHistory.scrollTop = chatHistory.scrollHeight;
+        return msgDiv;
     }
 
     function showInitialOptions() {
@@ -57,13 +58,16 @@ document.addEventListener("DOMContentLoaded", () => {
         // Add listeners to new buttons
         const buttons = chatHistory.querySelectorAll(".chat-option-btn");
         buttons.forEach(btn => {
-            btn.addEventListener("click", () => handleAgentSelection(btn.getAttribute("data-agent")));
+            btn.addEventListener("click", () => handleAgentSelection(btn.getAttribute("data-agent"), btn.textContent));
         });
     }
 
-    function handleAgentSelection(agentName) {
+    function handleAgentSelection(agentName, buttonText) {
         selectedAgent = agentName;
-        addChatMessage('user', agentName);
+        
+        // Display the user-friendly option name in the chat history instead of raw agent keys
+        const displayLabel = buttonText ? buttonText.replace(/^\d+\.\s*/, "").trim() : agentName;
+        addChatMessage('user', displayLabel);
 
         setTimeout(() => {
             // Share Market Agent: ask for symbol, no file upload needed
@@ -83,10 +87,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         </button>
                     </div>
                 `;
-                addChatMessage('bot', inputHtml, true);
+                const bubbleElement = addChatMessage('bot', inputHtml, true);
                 setTimeout(() => {
-                    const btn = document.getElementById("submitSymbolBtn");
-                    const inp = document.getElementById("stockSymbolInput");
+                    const btn = bubbleElement.querySelector("#submitSymbolBtn");
+                    const inp = bubbleElement.querySelector("#stockSymbolInput");
                     if (btn && inp) {
                         btn.addEventListener("click", () => {
                             const symbol = inp.value.trim().toUpperCase() || "NIFTY50";
@@ -119,10 +123,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         </button>
                     </div>
                 `;
-                addChatMessage('bot', inputHtml, true);
+                const bubbleElement = addChatMessage('bot', inputHtml, true);
                 setTimeout(() => {
-                    const btn = document.getElementById("submitKmcBtn");
-                    const inp = document.getElementById("kmcAssessInput");
+                    const btn = bubbleElement.querySelector("#submitKmcBtn");
+                    const inp = bubbleElement.querySelector("#kmcAssessInput");
                     if (btn && inp) {
                         btn.addEventListener("click", () => {
                             const assessNo = inp.value.trim() || "N/A";
@@ -144,10 +148,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     <input type="file" id="chatDeedFile" name="deed_file" accept=".pdf,.png,.jpg,.jpeg">
                 </div>
             `;
-            addChatMessage('bot', uploadHtml, true);
+            const bubbleElement = addChatMessage('bot', uploadHtml, true);
 
-            const fileInput = document.getElementById("chatDeedFile");
-            const fileLabel = document.getElementById("chatFileLabel");
+            const fileInput = bubbleElement.querySelector("#chatDeedFile");
+            const fileLabel = bubbleElement.querySelector("#chatFileLabel");
 
             fileInput.addEventListener("change", (e) => {
                 if (e.target.files.length > 0) {

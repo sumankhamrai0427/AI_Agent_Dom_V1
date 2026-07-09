@@ -69,7 +69,7 @@ class BrowserAgent:
             logger.error(f"Dynamic translation check failed: {e}. Using raw parameters.")
             return search_params
 
-    async def run_search_workflow(self, goal, start_url, search_params):
+    async def run_search_workflow(self, goal, start_url, search_params, selectors=None):
         logger.info(f"Browser Agent initiating search loop. Goal: '{goal}'")
         self.browser_manager = BrowserManager(headless=False)
         self.memory = MemoryManager(self.task_id, self.repository)
@@ -104,11 +104,18 @@ class BrowserAgent:
 
         loop_count = 0
         max_loops = 20
+        consecutive_failures = 0
         extracted_portal_data = None
         login_paused_and_resumed = False
 
         try:
             while loop_count < max_loops:
+                # Check for external cancellation
+                task_record = self.repository.get_task(self.task_id)
+                if not task_record or task_record.status == "FAILED":
+                    logger.info(f"Task #{self.task_id} has been cancelled/failed externally. Aborting browser search loop.")
+                    raise RuntimeError("Task was cancelled or marked as FAILED externally.")
+
                 loop_count += 1
                 current_url = page.url
                 logger.info(f"=== Observer Loop Step {loop_count} | URL: {current_url} ===")
@@ -545,6 +552,9 @@ class BrowserAgent:
                 You are an Autonomous Browser Agent. Your current Goal: '{goal}'.
                 Current URL: {current_url}
                 
+                Recommended Selectors for this Portal (Use these if present in the DOM):
+                {json.dumps(selectors) if selectors else "{}"}
+                
                 Search Parameters:
                 {json.dumps(search_params)}
                 
@@ -670,9 +680,17 @@ class BrowserAgent:
                 )
 
                 # Recoveries logic:
-                if not res["success"]:
+                if res["success"]:
+                    consecutive_failures = 0
+                else:
+                    consecutive_failures += 1
+                    logger.warning(f"Action failed. Consecutive failures: {consecutive_failures}/3")
+                    if consecutive_failures >= 3:
+                        logger.error("Action execution failed consecutively 3 times. Aborting browser search loop.")
+                        raise RuntimeError("Action execution failed consecutively 3 times. Stopping execution.")
+                    
                     # Action failed, wait or reload
-                    logger.warning(f"Action failed. Activating error-recovery. Reloading page...")
+                    logger.warning(f"Activating error-recovery. Reloading page...")
                     await self.executor.execute("refresh")
                     await asyncio.sleep(2)
                     

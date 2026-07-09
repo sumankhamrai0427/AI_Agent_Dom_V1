@@ -10,11 +10,11 @@ PORTAL_MAPPING = {
         "name": "Bhu Naksha UP",
         "url": "https://upbhunaksha.gov.in/",
         "selectors": {
-            "district_select": "#district_list",
-            "tehsil_select": "#tehsil_list",
-            "village_select": "#village_list",
-            "khata_input": "#khata_no",
-            "search_btn": "#search_button",
+            "district_select": "#mat-select-0",
+            "tehsil_select": "#mat-select-2",
+            "village_select": "#mat-select-4",
+            "khata_input": "#plotNo",
+            "search_btn": ".search-icon",
             "captcha_img": "#captcha_image",
             "result_table": "#result_table"
         }
@@ -68,8 +68,8 @@ PORTAL_MAPPING = {
         "name": "Redbus",
         "url": "https://www.redbus.in/",
         "selectors": {
-            "source_input": "#src",
-            "dest_input": "#dest",
+            "source_input": "#srcinput",
+            "dest_input": "#destinput",
             "date_input": "#onward_cal",
             "search_btn": "#search_btn"
         }

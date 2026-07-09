@@ -61,6 +61,12 @@ class SupervisorAgent:
         
         try:
             for step in plan_steps:
+                # Check for cancellation before executing each step
+                task_instance = self.repository.get_task(self.task_id)
+                if not task_instance or task_instance.status == "FAILED":
+                    logger.info(f"Task #{self.task_id} has been cancelled/failed externally. Aborting supervisor workflow.")
+                    return
+
                 step_name = step["task"]
                 step_index += 1
                 logger.info(f"Supervisor executing Step {step_index}: '{step_name}'")
@@ -73,6 +79,11 @@ class SupervisorAgent:
                 error_message = ""
 
                 while retry_count < max_retries and not step_success:
+                    # Check for cancellation inside retry loop
+                    task_instance = self.repository.get_task(self.task_id)
+                    if not task_instance or task_instance.status == "FAILED":
+                        logger.info(f"Task #{self.task_id} has been cancelled/failed externally. Aborting retry loop.")
+                        return
                     try:
                         # ── Share Market Agent Steps ───────────────────────────
                         if agent_type == "SHARE_MARKET" and "Search Stock Portal" in step_name:
@@ -101,7 +112,7 @@ class SupervisorAgent:
                             # We don't strictly need search params as the URL already has it, but passing symbol
                             search_params = {"symbol": symbol}
                             
-                            portal_data = await browser_agent.run_search_workflow(goal, target_url, search_params)
+                            portal_data = await browser_agent.run_search_workflow(goal, target_url, search_params, selectors=portal_task.get("selectors"))
                             step_success = True
 
                         elif agent_type == "SHARE_MARKET" and "Extract Stock Data" in step_name:
@@ -243,8 +254,8 @@ class SupervisorAgent:
                             goal_desc = (
                                 f"Search for bus tickets on Redbus. "
                                 f"IMPORTANT search sequence: "
-                                f"1. Type '{document_data.get('source')}' in the 'From' field, wait for autocomplete, and click the first suggestion. "
-                                f"2. Type '{document_data.get('destination')}' in the 'To' field, wait for autocomplete, and click the first suggestion. "
+                                f"1. Type '{document_data.get('source')}' in the 'From' field. "
+                                f"2. Type '{document_data.get('destination')}' in the 'To' field. "
                                 f"3. Select the travel date '{document_data.get('travel_date')}'. "
                                 f"4. Click 'Search Buses'. "
                             )
@@ -255,11 +266,11 @@ class SupervisorAgent:
                                 "destination": document_data.get('destination'),
                                 "travel_date": document_data.get('travel_date')
                             }
-                            
                             portal_data = await browser_agent.run_search_workflow(
                                 goal=goal_desc,
                                 start_url="https://www.redbus.in/",
-                                search_params=search_params
+                                search_params=search_params,
+                                selectors=SearchAgent.identify_portal("REDBUS").get("selectors")
                             )
                             
                             metadata["portal_data"] = portal_data
@@ -328,6 +339,35 @@ class SupervisorAgent:
                                     "area": metadata.get("area", "1.25 Hectares"),
                                     "reference_number": "N/A"
                                 }
+                            
+                            # Auto-detect state from document data
+                            doc_state = document_data.get("state")
+                            if doc_state:
+                                doc_state_upper = str(doc_state).strip().upper()
+                                if any(x in doc_state_upper for x in ["WEST BENGAL", "WB", "BENGAL"]):
+                                    metadata["state"] = "WB"
+                                elif any(x in doc_state_upper for x in ["UTTAR PRADESH", "UP"]):
+                                    metadata["state"] = "UP"
+                                elif "BIHAR" in doc_state_upper:
+                                    metadata["state"] = "BIHAR"
+                            
+                            # Fallback state detection using district/village/owner if state is still UP (default)
+                            if metadata.get("state", "UP") == "UP":
+                                dist = str(document_data.get("district") or "").upper()
+                                vill = str(document_data.get("village") or "").upper()
+                                owner_name_val = str(document_data.get("owner_name") or "").upper()
+                                text_to_check = f"{dist} {vill} {owner_name_val}"
+                                if any(d in text_to_check for d in ["BURDWAN", "HOOGHLY", "HOWRAH", "MEDINIPUR", "KOLKATA", "24 PARGANAS", "NADIA", "MURSHIDABAD", "BARDHAMAN", "WEST BENGAL", "DAS", "KHAMRAI", "BISWAS", "SUSHIL"]):
+                                    metadata["state"] = "WB"
+                                elif any(d in text_to_check for d in ["PATNA", "GAYA", "MUZAFFARPUR", "BHAGALPUR", "BIHAR"]):
+                                    metadata["state"] = "BIHAR"
+
+                            # Save updated metadata to DB so subsequent steps (like Search Government Portal) read it correctly
+                            task_instance = self.repository.get_task(self.task_id)
+                            if task_instance:
+                                task_instance.set_metadata(metadata)
+                                self.repository.commit()
+
                             # Save to Database
                             self.repository.save_document_record(self.task_id, document_data)
                             
@@ -336,7 +376,7 @@ class SupervisorAgent:
                                 agent_name="DocumentAgent",
                                 step_name=step_name,
                                 action="extract_document",
-                                result=f"Owner: {document_data.get('owner_name')}, Khata: {document_data.get('khata')}",
+                                result=f"Owner: {document_data.get('owner_name')}, Khata: {document_data.get('khata')} (Detected State: {metadata.get('state')})",
                                 status="SUCCESS"
                             )
                             step_success = True
@@ -452,7 +492,8 @@ class SupervisorAgent:
                             portal_data = await browser_agent.run_search_workflow(
                                 goal=goal_desc,
                                 start_url=portal_task["url"],
-                                search_params=search_params
+                                search_params=search_params,
+                                selectors=portal_task.get("selectors")
                             )
                             step_success = True
 

@@ -120,7 +120,7 @@ class GISProcessor:
 
         # Write GeoJSON file
         geojson_path = f"storage/reports/plot_{task_id}_geojson.json"
-        with open(geojson_path, "w") as f:
+        with open(geojson_path, "w", encoding="utf-8") as f:
             json.dump(geojson, f, indent=2)
 
         # 2. Generate KML
@@ -145,12 +145,12 @@ class GISProcessor:
 </kml>
 """
         kml_path = f"storage/reports/plot_{task_id}_kml.kml"
-        with open(kml_path, "w") as f:
+        with open(kml_path, "w", encoding="utf-8") as f:
             f.write(kml_content)
 
         # 3. Generate CSV
         csv_path = f"storage/reports/plot_{task_id}_coordinates.csv"
-        with open(csv_path, "w") as f:
+        with open(csv_path, "w", encoding="utf-8") as f:
             f.write("point_index,longitude,latitude\n")
             for idx, c in enumerate(plot_coords):
                 f.write(f"{idx},{c[0]},{c[1]}\n")
@@ -211,7 +211,7 @@ class GISProcessor:
         </html>
         """
         map_path = f"storage/reports/plot_{task_id}_map.html"
-        with open(map_path, "w") as f:
+        with open(map_path, "w", encoding="utf-8") as f:
             f.write(map_html)
 
         return {
