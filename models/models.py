@@ -123,7 +123,7 @@ class VerificationResult(Base):
 
 # DB Helper setup
 DB_PATH = 'sqlite:///agent_database.db'
-engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
+engine = create_engine(DB_PATH, connect_args={"check_same_thread": False, "timeout": 15})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():

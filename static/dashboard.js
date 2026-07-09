@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <button class="chat-option-btn" data-agent="Electricity Bill Agent">2. Electricity Bill Related</button>
                 <button class="chat-option-btn" data-agent="Share Market Agent">3. Share Market Related</button>
                 <button class="chat-option-btn" data-agent="Kolkata Municipal Corporation">4. KMC Related</button>
+                <button class="chat-option-btn" data-agent="Redbus Travel Agent">5. Redbus Travel Agent</button>
             </div>
         `;
         addChatMessage('bot', optionsHtml, true);
@@ -386,18 +387,38 @@ document.addEventListener("DOMContentLoaded", () => {
         if (task.extracted_document && deedPreviewCard && deedPreviewContent) {
             deedPreviewCard.style.display = "block";
             const doc = task.extracted_document;
-            deedPreviewContent.innerHTML = `
-                <div><strong>Owner Name:</strong> <span style="color:var(--secondary)">${doc.owner_name || 'N/A'}</span></div>
-                <div><strong>Father/Spouse:</strong> <span style="color:#FFF">${doc.father_name || 'N/A'}</span></div>
-                <div><strong>Utility Type:</strong> <span style="color:#FFF;text-transform:uppercase">${doc.utility_type || 'N/A'}</span></div>
-                <div><strong>Village Name:</strong> <span style="color:#FFF">${doc.village || 'N/A'}</span></div>
-                <div><strong>Khata Number:</strong> <span style="color:var(--secondary)">${doc.khata || 'N/A'}</span></div>
-                <div><strong>Khasra/Plot:</strong> <span style="color:#FFF">${doc.khasra || doc.survey_no || 'N/A'}</span></div>
-                <div><strong>Area:</strong> <span style="color:#FFF">${doc.area || 'N/A'}</span></div>
+            let htmlContent = `
+                <div><strong>${doc.utility_type === 'TRAVEL' ? 'Passenger Name' : 'Owner Name'}:</strong> <span style="color:var(--secondary)">${doc.passenger_name || doc.owner_name || 'N/A'}</span></div>
+                ${doc.utility_type !== 'TRAVEL' ? `<div><strong>Father/Spouse:</strong> <span style="color:#FFF">${doc.father_name || 'N/A'}</span></div>` : ''}
+                <div><strong>Utility Type:</strong> <span style="color:#FFF;text-transform:uppercase">${doc.utility_type || 'LAND'}</span></div>
+                ${doc.utility_type !== 'TRAVEL' ? `<div><strong>Village Name:</strong> <span style="color:#FFF">${doc.village || 'N/A'}</span></div>` : ''}
+            `;
+
+            if (doc.utility_type === 'ELECTRICITY') {
+                htmlContent += `
                 <div><strong>Consumer ID:</strong> <span style="color:var(--secondary)">${doc.consumer_id || 'N/A'}</span></div>
                 <div><strong>Installation ID:</strong> <span style="color:#FFF">${doc.installation_no || 'N/A'}</span></div>
                 <div><strong>Bill Amount:</strong> <span style="color:#FFF">${doc.bill_amount || 'N/A'}</span></div>
-            `;
+                `;
+            } else if (doc.utility_type === 'SHARE_MARKET') {
+                htmlContent += `
+                <div><strong>Symbol:</strong> <span style="color:var(--secondary)">${doc.symbol || 'N/A'}</span></div>
+                `;
+            } else if (doc.utility_type === 'TRAVEL') {
+                htmlContent += `
+                <div><strong>Source:</strong> <span style="color:var(--secondary)">${doc.source || 'N/A'}</span></div>
+                <div><strong>Destination:</strong> <span style="color:#FFF">${doc.destination || 'N/A'}</span></div>
+                <div><strong>Date of Travel:</strong> <span style="color:#FFF">${doc.travel_date || 'N/A'}</span></div>
+                `;
+            } else {
+                htmlContent += `
+                <div><strong>Khata Number:</strong> <span style="color:var(--secondary)">${doc.khata || 'N/A'}</span></div>
+                <div><strong>Khasra/Plot:</strong> <span style="color:#FFF">${doc.khasra || doc.survey_no || 'N/A'}</span></div>
+                <div><strong>Area:</strong> <span style="color:#FFF">${doc.area || 'N/A'}</span></div>
+                `;
+            }
+
+            deedPreviewContent.innerHTML = htmlContent;
         } else if (deedPreviewCard) {
             deedPreviewCard.style.display = "none";
         }
@@ -594,7 +615,14 @@ document.addEventListener("DOMContentLoaded", () => {
             downloadExcel.style.opacity = "0.5";
         }
 
-        if (task.gis_data) {
+        const geojsonCard = document.getElementById("geojsonCard");
+        const isNonLand = task.document && (task.document.utility_type === 'ELECTRICITY' || task.document.utility_type === 'SHARE_MARKET' || task.document.utility_type === 'TRAVEL');
+
+        if (geojsonCard) {
+            geojsonCard.style.display = isNonLand ? 'none' : 'flex';
+        }
+
+        if (task.gis_data && !isNonLand) {
             downloadGeoJson.href = `/api/storage/reports/plot_${task.id}_geojson.json`;
             downloadGeoJson.style.pointerEvents = "auto";
             downloadGeoJson.style.opacity = "1";
@@ -616,10 +644,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Adjust titles for Share Market
             const isShareMarket = task.document && task.document.utility_type === "SHARE_MARKET";
+            const isTravel = task.document && task.document.utility_type === "TRAVEL";
             if (isShareMarket) {
                 if (aiSectionTitle) aiSectionTitle.innerHTML = `<svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24"><path d="M16 11.78L20.24 4.45L21.97 5.45L16.74 14.5L10.23 10.75L5.46 19H22V21H2V3H4V17.54L11.27 7.5L16 11.78Z"/></svg> Share Market Analysis & Real-time Trends`;
                 if (aiConsumptionTitle) aiConsumptionTitle.innerText = "Market Analysis";
                 if (billingTrendTitle) billingTrendTitle.innerText = "Market Trend Graph";
+            } else if (isTravel) {
+                if (aiSectionTitle) aiSectionTitle.innerHTML = `<svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg> Travel Assistant Analysis`;
+                if (aiConsumptionTitle) aiConsumptionTitle.innerText = "Best Travel Options";
+                if (billingTrendTitle) billingTrendTitle.innerText = "Price Comparison";
             } else {
                 if (aiSectionTitle) aiSectionTitle.innerHTML = `<svg style="width:20px;height:20px;fill:var(--accent)" viewBox="0 0 24 24"><path d="M15,21H9V20H15V21M19,8H17.73C17.38,5.68 15.39,4 13,4C12.33,4 11.68,4.13 11.08,4.37C10.58,3.5 9.61,3 8.5,3C6.7,3 5.25,4.34 5.04,6.08C3.28,6.58 2,8.19 2,10A4,4 0 0,0 6,14H7.17C7.6,16.29 9.6,18 12,18C14.4,18 16.4,16.29 16.83,14H19A4,4 0 0,0 23,10A4,4 0 0,0 19,8M12,16A2,2 0 1,1 14,14A2,2 0 0,1 12,16Z" /></svg> Audit Results & Geographic Information Systems`;
                 if (aiConsumptionTitle) aiConsumptionTitle.innerText = "AI Consumption Analysis";
@@ -631,10 +664,17 @@ document.addEventListener("DOMContentLoaded", () => {
             // Set Summary Text
             const aiSummaryText = document.getElementById("aiSummaryText");
             if (aiSummaryText) {
-                aiSummaryText.innerHTML = `
-                    <p style="margin-top: 0;"><b>Summary:</b> ${aiData.summary || "No summary available."}</p>
-                    <p style="margin-bottom: 0;"><b>Recommendation for Next Month:</b> ${aiData.recommendation || "No recommendations available."}</p>
-                `;
+                if (isTravel) {
+                    aiSummaryText.innerHTML = `
+                        <p style="margin-top: 0;"><b>Summary:</b> ${aiData.summary || "No summary available."}</p>
+                        <p style="margin-bottom: 0;"><b>Recommendation:</b> ${aiData.recommendation || "No recommendations available."}</p>
+                    `;
+                } else {
+                    aiSummaryText.innerHTML = `
+                        <p style="margin-top: 0;"><b>Summary:</b> ${aiData.summary || "No summary available."}</p>
+                        <p style="margin-bottom: 0;"><b>Recommendation for Next Month:</b> ${aiData.recommendation || "No recommendations available."}</p>
+                    `;
+                }
             }
 
             // Render Graph
